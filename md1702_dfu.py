@@ -18,7 +18,7 @@ import time
 
 import usb.core
 
-from DMR1702_DFU import DFU, State
+from DMR1702_DFU import DFU, Versions
 
 # The tricky thing is that *TWO* different applications all show up
 # as this same VID/PID pair.
@@ -114,11 +114,11 @@ def upload_firmware(dfu, filename):
     finally:
         f.close()
 
-def upload(dfu, filename, start=0, end=0xFFFFFF):
-    print("Dumping SPI flash data.")
+def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
+    """Dumps the SPI flash data for given range."""
     f = open(filename, 'wb')
     try:
-        data = dfu.upload_spi(start, end-start+1)
+        data = dfu.upload_spi(start, end-start+1, crop=crop)
         if f is not None:
             f.write(data)
         else:
@@ -128,6 +128,7 @@ def upload(dfu, filename, start=0, end=0xFFFFFF):
         f.close()
 
 def init_dfu(alt=0, dfu_mode=True):
+    """Initializes the DFU switching to USB program mode."""
     dev = usb.core.find(idVendor=md1702_vendor, idProduct=md1702_product)
 
     if dev is None:
@@ -160,8 +161,13 @@ Read a firmware and write it to a file.
 Read a RAW codeplug and write it to a file.
     md1702-dfu readcp <codeplug.raw>
 
-Read a full SPI flash dump including a codeplug and write it to a file (very slow)
-    md1702-dfu read <spiflash.bin>
+Read a voice data/HZK font/Boot image and write it to a file.
+    md1702-dfu readvoice <voice.enc>
+    md1702-dfu readfont <font.hzk>
+    md1702-dfu readlogo <bootlogo.bin>
+
+Read a full SPI flash dump including a codeplug and write it to a file (very slow, ~1h)
+    md1702-dfu readspi <spiflash.bin>
 
 Dump the config block from Flash memory.
     md1702-dfu readcfg <cfg_filename.bin>
@@ -189,8 +195,33 @@ def main():
                 print("Dumping RAW codeplug.")
                 upload(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
 
-            if sys.argv[1] == 'read':
+            if sys.argv[1] == 'readlogo':
                 import usb.core
+                dfu = init_dfu()
+                print("Dumping Boot logo raw image.")
+                start, end = dfu.verify_addrs(Versions['Logo']) #logo offsets are not available in SPI_USB mode
+                dfu.enter_spi_usb_mode()
+                upload(dfu, sys.argv[2], start, end, crop=False)
+
+            if sys.argv[1] == 'readfont':
+                import usb.core
+                dfu = init_dfu()
+                dfu.enter_spi_usb_mode()
+                print("Dumping HZK font data.")
+                start, end = dfu.verify_addrs(Versions['HZKFont'])
+                upload(dfu, sys.argv[2], start, end)
+
+            if sys.argv[1] == 'readvoice':
+                import usb.core
+                dfu = init_dfu()
+                dfu.enter_spi_usb_mode()
+                print("Dumping Voice data.")
+                start, end = dfu.verify_addrs(Versions['Voices'])
+                upload(dfu, sys.argv[2], start, end)
+
+            if sys.argv[1] == 'readspi':
+                import usb.core
+                print("Dumping 16MB of RAW SPI flash data, please be patient, it takes an hour.")
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
                 upload(dfu, sys.argv[2])

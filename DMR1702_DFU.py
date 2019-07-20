@@ -9,33 +9,6 @@ import time
 import usb
 
 
-class Enumeration(object):
-    def __init__(self, id, name):
-        self._id = id
-        self._name = name
-        setattr(self.__class__, name, self)
-        self.map[id] = self
-
-    def __int__(self):
-        return self.id
-
-    def __repr__(self):
-        return self.name
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def name(self):
-        return self._name
-
-    @classmethod
-    def create_from_map(cls):
-        for id, name in cls.map.items():
-            cls(id, name)
-
-
 Requests = {
         'NEXT' : B'\x06',
         'READ' : 'R',
@@ -81,17 +54,6 @@ Versions = {
         'Custom' : 13,
         'Logo' : 14,
     }
-
-
-class State(Enumeration):
-    map = {
-        0: 'None',
-        2: 'Error',
-        6: 'OK',
-    }
-
-
-State.create_from_map()
 
 
 class DFU(object):
@@ -207,7 +169,7 @@ class DFU(object):
             print('')
         return array('B',(self.dtrim(data)))
 
-    def upload_spi(self, address, length, delta=None, delay=None):
+    def upload_spi(self, address, length, delta=None, delay=None, crop=True):
         if self.verbose:
             print("Fetching %i bytes of data from SPI at 0x%06x." % (length, address))
         caddr = address
@@ -236,7 +198,10 @@ class DFU(object):
               time.sleep(delay)
         if not self.verbose:
             print('')
-        return array('B',(self.dtrim(data)))
+        if crop:
+            return array('B',(self.dtrim(data)))
+        else:
+            return array('B',data)
 
     def send_text(self, what):
         #print("Send: %s" % what)
