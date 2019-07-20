@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="5780", MODE="0660", GROUP="dialout", RUN +="/etc/udev/scripts/unbind_bao1702.sh"
