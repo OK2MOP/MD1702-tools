@@ -294,6 +294,17 @@ def main():
                     start, end = dfu.verify_addrs(Versions['Voices'])
                     download(dfu, data, start, end)
 
+            if sys.argv[1] == 'writecp':
+                with open(sys.argv[2], 'rb') as f:
+                    data = f.read()
+                    if len(data) == 0x3C000:
+                        print('According to the size, this is official codeplug, which is presently not supported. Aborting.')
+                        return
+                    dfu = init_dfu()
+                    dfu.enter_spi_usb_mode()
+                    print("Writing RAW codeplug.")
+                    download(dfu, data, dfu.cps_start, dfu.cps_end)
+
             elif sys.argv[1] == "upgrade":
                 import usb.core
                 with open(sys.argv[2], 'rb') as f:
