@@ -18,7 +18,8 @@ As the radio is detected by Linux incorrectly as an USB lp port, the driver
 must be removed for the device.
 
 Client Tools:
-* `md1702-dfu` reads <del>and writes</del> MD1702 codeplugs and firmware.
+* `md1702-dfu` reads and writes MD1702 codeplugs, firmware and time. Run it without
+an argument to display help options
 * `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo 
 
 ## Requirements: ##
