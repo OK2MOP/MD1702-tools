@@ -20,7 +20,7 @@ must be removed for the device.
 Client Tools:
 * `md1702-dfu` reads and writes MD1702 codeplugs, firmware and time. Run it without
 an argument to show help. 
-* `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo 
+* `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo.
 
 ## Requirements: ##
 
@@ -36,7 +36,7 @@ an argument to show help.
 This project should work across Linux, and should work on Mac OS, and Windows, but has
 not been tested on them platforms.  A separate client, 
 
-### Additional steps for Linux-based installations with udev rules###
+### Additional steps for Linux-based installations with udev rules ###
 
 ```
 # Clone the repository to MD1702-tools
