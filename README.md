@@ -19,7 +19,7 @@ must be removed for the device.
 
 Client Tools:
 * `md1702-dfu` reads and writes MD1702 codeplugs, firmware and time. Run it without
-an argument to display help options
+an argument to show help. 
 * `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo 
 
 ## Requirements: ##
@@ -39,21 +39,22 @@ not been tested on them platforms.  A separate client,
 ### Additional steps for Linux-based installations with udev rules###
 
 ```
+# Clone the repository to MD1702-tools
 cd MD1702-tools
 sudo cp -r udev/* /etc/udev/ 
 ```
-(The 59-baofeng-1702.rules and unbind_bao1702.sh files are copied to /etc/udev/ in order to allow users to access the radio over USB without having to use sudo or root permissions and remove the driver. User should be a member of dialout group. If it is not, you may use ```sudo usermod -a -G dialout $USER``` to add your user, then log in and out)
+(The ```59-baofeng-1702.rules``` and ```unbind_bao1702.sh``` files are copied to /etc/udev/ in order to allow users to access the radio over USB without having to use sudo or root permissions and remove the driver. User should be a member of dialout group. If it is not, you may use ```sudo usermod -a -G dialout $USER``` to add your user, then log in and out).
 
 If you do not wish to modify the udev, and you do not use any other usblp device, you can 
 prefix the `md1702-dfu` each time with ```sudo modprobe -r usblp;``` 
 
 ### Flash updated firmware for Linux-based installations ###
 
-To update firmware, an unencrypted firmware image is required. For now the functionality, 
-although reverse-engineered has not been included.
+To update firmware, an unencrypted firmware image is required. 
 
 Turn on radio in DFU mode to begin firmware update with USB cable:
 * insert cable into USB.
 * connect cable to DM-X/DM-1702.
 * power-on the device by turning volume knob, while holding '#' button. The device screen will
-remain black and it will stay in firmware update mode
+remain black and it will stay in firmware update mode.
+* run the ```md1702_dfu.py``` in upgrade mode supplying the firmware.
