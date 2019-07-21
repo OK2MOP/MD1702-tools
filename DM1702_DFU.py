@@ -73,7 +73,7 @@ DFUComm = {
     }
 
 
-class DFU(object):
+class DM1702_DFU(object):
     #verbose = True
     verbose = False
     cps_start = 0x001000

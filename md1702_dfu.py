@@ -18,7 +18,7 @@ import time
 
 import usb.core
 
-from DMR1702_DFU import DFU, Versions
+from DM1702_DFU import DM1702_DFU, Versions
 
 # The tricky thing is that *TWO* different applications all show up
 # as this same VID/PID pair.
@@ -148,7 +148,7 @@ def init_dfu(alt=0, dfu_mode=True):
     if dev is None:
         raise RuntimeError('Device not found')
 
-    dfu = DFU(dev, alt)
+    dfu = DM1702_DFU(dev, alt)
     if dfu_mode:
         dev.default_timeout = 3000
         try:
@@ -289,6 +289,9 @@ def main():
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu()
+                    if data[:0x1000] == ('\xff' * 0x1000) and data[0x1016:0x101B] == '1.txt':
+                        print('Stock voice data from MD, removing first 0x1000 bytes')
+                        data = data[0x1000:]
                     dfu.enter_spi_usb_mode()
                     print("Setting Voice data.")
                     start, end = dfu.verify_addrs(Versions['Voices'])
