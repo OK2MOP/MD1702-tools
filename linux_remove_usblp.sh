@@ -1,3 +1,3 @@
 #!/bin/sh
 export PRODUCT=483/5780/
-sudo -E ./udev/scripts/unbind_bao1702.sh
+sudo -E /bin/sh ./udev/scripts/unbind_bao1702.sh

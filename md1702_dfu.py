@@ -52,9 +52,6 @@ def hexdump(string):
 
     print(buf)
 
-def download(dfu, data, flash_address):
-    return
-
 def download_codeplug(dfu, data):
     return
 
@@ -94,6 +91,17 @@ def upload_config(dfu, filename):
     finally:
         print("Done.")
 
+def display_versions(dfu):
+    """Dumps the version information from radio."""
+    for i in [ 'FWVersion', 'RefDate', 'DataFormat', 'GPSFormat', 'CPSFormat' ] :
+        print("%s= %s"  % (i + (' ' * (12-len(i))), dfu.to_str(dfu.verify(Versions[i]))))
+
+    for i in [ 'Voices', 'HZKFont', 'Recordings', 'Settings', 'Logo', 'Unknown1' ]:
+        start, end = dfu.verify_addrs(Versions[i])
+        print("%s= 0x%06x - 0x%06x "  % (i+ (' ' * (12-len(i))), start, end ))
+    dfu.enter_spi_usb_mode()
+    print('DeviceID    = 0x%s' % dfu.hd(dfu.verify(Versions['DeviceID'])))
+
 def upload_firmware(dfu, filename):
     """Dumps the firmware at 0x8008000."""
     fw_addr = 0x4000 #Block after config
@@ -127,6 +135,12 @@ def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
     finally:
         f.close()
 
+def download(dfu, data, start, end):
+    """Writes the SPI flash data for given range."""
+    if (end-start+1 < len(data)):
+        raise RuntimeError('Uploaded data size %i is larger than maximum allowed size %i' % (len(data), end-start+1))
+    dfu.download_spi(start, data, end-start+1)
+
 def init_dfu(alt=0, dfu_mode=True):
     """Initializes the DFU switching to USB program mode."""
     dev = usb.core.find(idVendor=md1702_vendor, idProduct=md1702_product)
@@ -135,8 +149,8 @@ def init_dfu(alt=0, dfu_mode=True):
         raise RuntimeError('Device not found')
 
     dfu = DFU(dev, alt)
-    dev.default_timeout = 3000
     if dfu_mode:
+        dev.default_timeout = 3000
         try:
             dfu.enter_dfu_mode()
         except usb.core.USBError as e:
@@ -144,7 +158,8 @@ def init_dfu(alt=0, dfu_mode=True):
                 raise RuntimeError('Failed to enter DFU mode. Is the device running in normal mode?')
             else:
                 raise e
-
+    else:
+        dev.default_timeout = 15000
     return dfu
 
 
@@ -161,10 +176,18 @@ Read a firmware and write it to a file.
 Read a RAW codeplug and write it to a file.
     md1702-dfu readcp <codeplug.raw>
 
+Display device version information
+    md1702-dfu versions
+
 Read a voice data/HZK font/Boot image and write it to a file.
-    md1702-dfu readvoice <voice.enc>
+    md1702-dfu readvoice <voice.bin>
     md1702-dfu readfont <font.hzk>
     md1702-dfu readlogo <bootlogo.bin>
+
+Write voice data/HZK font/Boot image and from a file (no checking of correct file type is done!).
+    md1702-dfu writevoice <voice.bin>
+    md1702-dfu writefont <font.hzk>
+    md1702-dfu writelogo <bootlogo.bin>
 
 Read a full SPI flash dump including a codeplug and write it to a file (very slow, ~1h)
     md1702-dfu readspi <spiflash.bin>
@@ -179,8 +202,7 @@ Set time and date on MD1702 to system time or specified time.
 Close the bootloader session.
     md1702-dfu reboot
 
-
-Upgrade to new firmware:
+Upgrade to new firmware (not implemented):
     md1702-dfu upgrade foo.bin
 """)
 
@@ -242,13 +264,43 @@ def main():
                 dfu = init_dfu(dfu_mode=False)
                 dfu.set_time(sys.argv[2])
 
-            elif sys.argv[1] == "upgrade":
+            elif sys.argv[1] == 'writelogo':
                 import usb.core
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu()
-                    print ("Upgrade is not implemented for safety reasons for now")
-                    #download_firmware(dfu, data)
+                    print("Setting Boot logo raw image.")
+                    start, end = dfu.verify_addrs(Versions['Logo']) #logo offsets are not available in SPI_USB mode
+                    dfu.enter_spi_usb_mode()
+                    download(dfu, data, start, end)
+
+            elif sys.argv[1] == 'writefont':
+                import usb.core
+                with open(sys.argv[2], 'rb') as f:
+                    data = f.read()
+                    dfu = init_dfu()
+                    dfu.enter_spi_usb_mode()
+                    print("Setting HZK font data.")
+                    start, end = dfu.verify_addrs(Versions['HZKFont'])
+                    download(dfu, data, start, end)
+
+            elif sys.argv[1] == 'writevoice':
+                import usb.core
+                with open(sys.argv[2], 'rb') as f:
+                    data = f.read()
+                    dfu = init_dfu()
+                    dfu.enter_spi_usb_mode()
+                    print("Setting Voice data.")
+                    start, end = dfu.verify_addrs(Versions['Voices'])
+                    download(dfu, data, start, end)
+
+            elif sys.argv[1] == "upgrade":
+                import usb.core
+                with open(sys.argv[2], 'rb') as f:
+                    data = f.read()
+                    dfu = init_dfu(dfu_mode=False)
+                    dfu.enter_bootloader_mode()
+                    dfu.download_fw(data, sys.argv[2])
 
         elif len(sys.argv) == 2:
             if sys.argv[1] == 'settime':
@@ -259,7 +311,18 @@ def main():
             elif sys.argv[1] == 'reboot':
                 import usb.core
                 dfu = init_dfu()
-                dfu.md1702_reboot()
+                dfu.reboot()
+
+            elif sys.argv[1] == 'versions':
+                import usb.core
+                dfu = init_dfu()
+                display_versions(dfu)
+
+            elif sys.argv[1] == "upgrade_check":
+                import usb.core
+                dfu = init_dfu(dfu_mode=False)
+                dfu.enter_bootloader_mode()
+                print ("Please turn off the radio now.")
             else:
                 usage()
         else:
