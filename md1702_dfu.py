@@ -4,11 +4,13 @@
 
 # Copyright 2010, 2011 Michael Ossmann
 # Copyright 2015 Travis Goodspeed
+# Copyright 2019 Pavel Moravec
 #
-# This file was forked from Project Ubertooth as a DFU client for the
-# TYT MD1702, an amateur radio for the DMR protocol on the UHF bands.
-# This script implements a lot of poorly understood extensions unique
-# to the MD1702.
+# This file was based on md380-tools project file by Travis Goodsped,
+# forked from Project Ubertooth as a DFU client for the TYT MD380 radio
+# for Baofeng MD1702, an amateur dual-band radio for the DMR protocol.
+# This script implements the poorly understood communication protocol
+# unique to the MD1702.
 
 
 from __future__ import print_function
@@ -17,6 +19,7 @@ import sys
 import time
 
 import usb.core
+import os.path
 
 from DM1702_DFU import DM1702_DFU, Versions
 
@@ -342,11 +345,16 @@ def main():
         else:
             usage()
     except RuntimeError as e:
-        print(e.args[0])
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno)
+        print(e)
         exit(1)
     except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno)
         print(e)
-        # print(dfu.get_status())
         exit(1)
 
 

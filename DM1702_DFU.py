@@ -8,7 +8,6 @@ import sys
 import time
 import usb
 
-
 Requests = {
         'NEXT' : B'\x06',
         'READ' : 'R',
@@ -136,7 +135,9 @@ class DM1702_DFU(object):
         msb = crc >> 8
         lsb = crc & 255
         for c in data:
-            x = ord(c) ^ msb
+            if (type(c) == type('c')): # Python 3
+                c = ord(c)
+            x = c ^ msb
             x ^= (x >> 4)
             msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
             lsb = (x ^ (x << 5)) & 255
@@ -145,15 +146,19 @@ class DM1702_DFU(object):
     def download_fw(self, in_data, name="firmware.bin"):
         if len(in_data) > self.max_fw_size or len(in_data) < self.min_known_fw_size:
             raise Exception("Firmware size %i is not between %i and %i bytes, sanity check failed" % (len(in_data), self.min_known_fw_size, self.max_fw_size))
-        # time.sleep(0.1);
-        if in_data[3] != '\x20' or in_data[2] > '\x01' or in_data[7] != '\x08' or in_data[0xb] != '\x08' or in_data[0xf] != '\x08':
-            raise Exception("Firmware header sanity check failed, probably trying to flash encrypted firmware (use official app)")
+
+        cf = "Firmware header sanity check failed, probably trying to flash encrypted firmware (use official app)"
+        if isinstance(in_data, str):
+            if in_data[3] != '\x20' or in_data[2] > '\x01' or in_data[7] != '\x08' or in_data[0xb] != '\x08' or in_data[0xf] != '\x08':
+                raise Exception(cf)
+        else:
+            if in_data[3] != 0x20 or in_data[2] > 0x01 or in_data[7] != 0x08 or in_data[0xb] != 0x08 or in_data[0xf] != 0x08:
+                raise Exception(cf)
 
         # Generate packet with metadata
         name=name.split('/')[-1]
-        header='\x00\xff' + name + '\x00' + str(len(in_data))
-        header += '\x00' * (130-len(header))
-        #print(self.hd(header))
+        header=(B'\x00\xff%s\x00%i' % (name.encode(), len(in_data)))
+        header += B'\x00' * (130-len(header))
         #raise Exception('Firmware upgrade is not implemented yet, some parts are missing');
 
         self.send_data(DFUComm['Erase'], [0, 0, 0] , 0)
@@ -178,22 +183,22 @@ class DM1702_DFU(object):
         block_id=1
         caddr=0x8000
         while len(in_data) > 0:
-            block=chr(block_id) + chr(0xff-block_id) + in_data[:1024]
+            if isinstance(in_data, str):
+                block=chr(block_id & 0xff) + chr((0xff-(block_id & 0xff))) + in_data[:1024]
+            else:
+                block=B"%c%c%s" % (block_id & 0xff, 0xff-(block_id & 0xff), in_data[:1024])
             csum16=self.crc16_xmodem(in_data[:1024])
             in_data = in_data[1024:]
-            if block_id == 0xff:
-                block_id = 0
-            else:
-                block_id += 1
+            block_id += 1
             self.send_text(DFUComm['Stage2'])
             result = self.read_reply()
             if result != DFUComm['Continue'] :
-                raise Exception('Entering FW update stage 2 failed')
+                raise Exception('Update stage 2 failed')
             self.send_text(block)
             self.send_text(csum16)
             result = self.read_reply()
             if result != DFUComm['OK'] :
-                raise Exception('Sending block %i failed', block_id)
+                raise Exception('Sending block %i failed' % block_id)
             if self.verbose:
                 print("Download request at 0x%06x, l=%i" % (caddr, len(block)-2))
             else:
