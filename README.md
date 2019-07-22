@@ -20,7 +20,7 @@ must be removed for the device.
 Client Tools:
 * `md1702-dfu` reads and writes MD1702 codeplugs, firmware and time. Run it without
 an argument to show help.
-* `md1702_gfx` allows you to convert the boot logo graphics into an image editable in
+* `md1702-gfx` allows you to convert the boot logo graphics into an image editable in
 external tool and back, and to show the boot logo image extracted from the radio.
 * `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo.
 
