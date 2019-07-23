@@ -39,22 +39,6 @@ md1702_product = 0x5780
 # ram_offset = 0x20000000
 # bootloader_size   = 0x00004000
 
-def hexdump(string):
-    """God awful hex dump function for testing taken from md380tools."""
-    buf = ""
-    i = 0
-    for c in string:
-        buf += "%02x" % c
-        i += 1
-        if i & 3 == 0:
-            buf += " "
-        if i & 0xf == 0:
-            buf += "   "
-        if i & 0x1f == 0:
-            buf += "\n"
-
-    print(buf)
-
 def download_codeplug(dfu, data):
     return
 
