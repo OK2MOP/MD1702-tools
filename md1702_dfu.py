@@ -302,6 +302,8 @@ def main():
                     dfu = init_dfu(dfu_mode=False)
                     dfu.enter_bootloader_mode()
                     dfu.download_fw(data, sys.argv[2])
+            else:
+                usage()
 
         elif len(sys.argv) == 2:
             if sys.argv[1] == 'settime':
