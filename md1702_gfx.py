@@ -36,7 +36,6 @@ Read a bootlogo image and write it to Boot image
 
 Read a bootlogo image and show it on screen
     md1702-gfx show <bootlogo.bin>
-
 """)
 
 def gfx_from_image(data):
