@@ -31,6 +31,7 @@ from DM1702_DFU import DM1702_DFU, Versions
 md1702_vendor = 0x0483
 md1702_product = 0x5780
 
+verbose_err = True
 
 # flash_config = 0x08004000
 # application = 0x08008000
@@ -204,7 +205,7 @@ def main():
                 print("Dumping RAW codeplug.")
                 upload(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
 
-            if sys.argv[1] == 'readlogo':
+            elif sys.argv[1] == 'readlogo':
                 import usb.core
                 dfu = init_dfu()
                 print("Dumping Boot logo raw image.")
@@ -212,7 +213,7 @@ def main():
                 dfu.enter_spi_usb_mode()
                 upload(dfu, sys.argv[2], start, end, crop=False)
 
-            if sys.argv[1] == 'readfont':
+            elif sys.argv[1] == 'readfont':
                 import usb.core
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
@@ -220,7 +221,7 @@ def main():
                 start, end = dfu.verify_addrs(Versions['HZKFont'])
                 upload(dfu, sys.argv[2], start, end)
 
-            if sys.argv[1] == 'readvoice':
+            elif sys.argv[1] == 'readvoice':
                 import usb.core
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
@@ -228,7 +229,7 @@ def main():
                 start, end = dfu.verify_addrs(Versions['Voices'])
                 upload(dfu, sys.argv[2], start, end)
 
-            if sys.argv[1] == 'readspi':
+            elif sys.argv[1] == 'readspi':
                 import usb.core
                 print("Dumping 16MB of RAW SPI flash data, please be patient, it takes an hour.")
                 dfu = init_dfu()
@@ -284,7 +285,7 @@ def main():
                     start, end = dfu.verify_addrs(Versions['Voices'])
                     download(dfu, data, start, end)
 
-            if sys.argv[1] == 'writecp':
+            elif sys.argv[1] == 'writecp':
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     if len(data) == 0x3C000:
@@ -330,19 +331,13 @@ def main():
                 usage()
         else:
             usage()
-    except RuntimeError as e:
+    except (RuntimeError, Exception) as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        if verbose_err:
+            print(exc_type, fname, exc_tb.tb_lineno)
         print(e)
         exit(1)
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
-        print(e)
-        exit(1)
-
 
 if __name__ == '__main__':
     main()

@@ -22,6 +22,8 @@ logo_hdr = B'\x02\xa0\x80\x00\x50\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
 python_v2 = (sys.version.split('.')[0] == '2')
 
+verbose_err = True
+
 def usage():
     print("""
 Usage: md1702-gfx <command> <arguments>
@@ -115,10 +117,10 @@ def main():
                 with open(infile, 'rb') as f:
                     data = f.read()
                 data1 = data[0:16]
-                data2 = data[16:]
+                data2 = data[16:gfx_size[1] * gfx_size[0] + 16]
                 if data1 != logo_hdr:
                     print("The image header has changed, proceed with caution")
-                if len(data2) != gfx_size[1] * gfx_size[0]:
+                if len(data2) < gfx_size[1] * gfx_size[0]: # Accept larger image dumps
                     print("The image size does not match, probably a different model, giving up")
                     return
                 f2 = open(outfile + '.hdr', 'wb')
@@ -134,24 +136,23 @@ def main():
             if sys.argv[1] == 'show':
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
-                data2 = data[16:]
+                data2 = data[16:gfx_size[1] * gfx_size[0] + 16]
                 if len(data2) != gfx_size[1] * gfx_size[0]:
                     print("The image size does not match, probably a different model, giving up")
                     return
                 im = Image.frombytes("RGB", gfx_size, gfx_to_image(data2))
                 im.show()
+            else:
+                usage()
         else:
             usage()
-    except RuntimeError as e:
-        print('Error: ' + e)
-        exit(1)
-    except Exception as e:
+    except (RuntimeError, Exception) as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        if verbose_err:
+            print(exc_type, fname, exc_tb.tb_lineno)
         print(e)
         exit(1)
-
 
 if __name__ == '__main__':
     main()

@@ -35,6 +35,11 @@ external tool and back, and to show the boot logo image extracted from the radio
 * libusb 1.0: (0.4 does not work.)
   http://www.libusb.org/
 
+Optionally, if you want to specify date on command line in other formats 
+
+* dateutil:
+  https://github.com/dateutil/dateutil/
+
 If you wish to manipulate the Boot logo graphics, you will also need
 
 * pillow 1.1.4 or newer:

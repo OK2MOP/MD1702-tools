@@ -75,14 +75,65 @@ DFUComm = {
 class DM1702_DFU(object):
     #verbose = True
     verbose = False
-    cps_start = 0x001000
-    cps_end = 0x0c8fff
     sector_size = 1 << 12
     max_fw_size = 0xF7000
     min_known_fw_size = 0x9EF00
     delta = 0x40 # Maximum save block size is 64 bytes
 
+    @staticmethod
+    def crc16_xmodem(data, crc=0x0000):
+        msb = crc >> 8
+        lsb = crc & 255
+        for c in data:
+            if (type(c) == type('c')): # Python 3
+                c = ord(c)
+            x = c ^ msb
+            x ^= (x >> 4)
+            msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
+            lsb = (x ^ (x << 5)) & 255
+        return chr(msb) + chr(lsb)
+
+    @staticmethod
+    def _wait():
+        time.sleep(0.1)
+        return True
+
+    @staticmethod
+    def fladdr2bytes(address):
+        return [(address & 0xf0000) >> 12, (address >> 8) & 0xff, (address & 0xff)]
+
+    @staticmethod
+    def spiaddr2bytes(address):
+        return [(address & 0xff), (address >> 8) & 0xff, (address >> 16) & 0xff]
+
+    @staticmethod
+    def dtrim(data):
+        last = len(data) - 1;
+        while data[last] == 0xff :
+            last -= 1
+            if last == 0:
+                return []
+        #print ("Dtrim final length: 0x%0x" % (last+1))
+        return data[:(last+1)]
+
+    @staticmethod
+    def hd(data):
+        import binascii
+        return binascii.hexlify(data).decode('ascii')
+
+    @staticmethod
+    def to_str(data):
+        if isinstance(data,str):
+            return data
+        elif isinstance(data,list) or isinstance(data,array):
+            return ''.join([chr(x) for x in data])
+        else:
+            raise Exception("Cannot convert data to string")
+
     def __init__(self, device, alt):
+        self.cps_start = 0x001000
+        self.cps_end = 0x0c8fff
+
         self._device = device
         device.set_configuration(1)
         # get an endpoint instance
@@ -114,10 +165,13 @@ class DM1702_DFU(object):
         from datetime import datetime
         if tstr is not None:
             try:
-                t = datetime.strptime(tstr, '%m/%d/%Y %H:%M:%S')
-            except ValueError:
-                raise Exception("Usage: set_time \"mm/dd/yyyy HH:MM:SS\" (with quotes)")
-                exit()
+                from dateutil.parser import parse
+                t = parse(tstr) #Better date parsing if available
+            except (ImportError, ValueError):
+                try:
+                    t = datetime.strptime(tstr, '%m/%d/%Y %H:%M:%S')
+                except ValueError:
+                    raise Exception("Use \"mm/dd/yyyy HH:MM:SS\" (with quotes) as the date string")
         else:
             t = datetime.now()
         timedata = [ t.year & 0xff, (t.year & 0xff00) >> 8, t.month, t.day, t.hour, t.minute, t.second ]
@@ -130,18 +184,6 @@ class DM1702_DFU(object):
         data = self.read_reply()
         if data != Statuses['OK'] :
             raise Exception('Time setting failed')
-
-    def crc16_xmodem(self, data, crc=0x0000):
-        msb = crc >> 8
-        lsb = crc & 255
-        for c in data:
-            if (type(c) == type('c')): # Python 3
-                c = ord(c)
-            x = c ^ msb
-            x ^= (x >> 4)
-            msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
-            lsb = (x ^ (x << 5)) & 255
-        return chr(msb) + chr(lsb)
 
     def download_fw(self, in_data, name="firmware.bin"):
         if len(in_data) > self.max_fw_size or len(in_data) < self.min_known_fw_size:
@@ -209,11 +251,6 @@ class DM1702_DFU(object):
         self.reboot_fw()
         print('Upgrade finished, turn the device off and on normally')
 
-    def _wait(self):
-        time.sleep(0.1)
-
-        return True
-
     def reboot(self):
         self.send_text(Requests['NEXT'])
         return True
@@ -224,21 +261,6 @@ class DM1702_DFU(object):
         if data != DFUComm['Continue'] :
             raise Exception('DFU reboot failed')
         return True
-
-    def fladdr2bytes(self, address):
-        return [(address & 0xf0000) >> 12, (address >> 8) & 0xff, (address & 0xff)]
-
-    def spiaddr2bytes(self, address):
-        return [(address & 0xff), (address >> 8) & 0xff, (address >> 16) & 0xff]
-
-    def dtrim(self, data):
-        last = len(data) - 1;
-        while data[last] == 0xff :
-            last -= 1
-            if last == 0:
-                return []
-        #print ("Dtrim final length: 0x%0x" % (last+1))
-        return data[:(last+1)]
 
     def upload(self, address, length, delta=None, delay=None):
         if self.verbose:
@@ -356,18 +378,6 @@ class DM1702_DFU(object):
         #print("Send: %c, data: %s" % (chr(command), self.hd(data)))
         self._ep.write(data)
 
-    def hd(self, data):
-        import binascii
-        return binascii.hexlify(data).decode('ascii')
-
-    def to_str(self, data):
-        if isinstance(data,str):
-            return data
-        elif isinstance(data,list) or isinstance(data,array):
-            return ''.join([chr(x) for x in data])
-        else:
-            raise Exception("Cannot convert data to string")
-
     def read_reply(self):
         data=self._device.read(self._ep2.bEndpointAddress,self._ep2.wMaxPacketSize)
         #print("Reply: %s" % self.hd(data))
@@ -471,6 +481,3 @@ class DM1702_DFU(object):
             print('Bootloader (model) version: %s' % self.to_str(data))
         if int(data[8:]) not in DFUComm['Supported']:
             raise Exception('Not a known working bootloader (model) version, giving up')
-
-    def _wait(self):
-        time.sleep(0.1)
