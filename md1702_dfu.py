@@ -202,11 +202,11 @@ Set time and date on MD1702 to system time or specified time.
     md1702-dfu settime
     md1702-dfu settime "mm/dd/yyyy HH:MM:SS" (with quotes)
 
-Close the bootloader session.
+Reboot the device in normal mode.
     md1702-dfu reboot
 
-Upgrade to new firmware (not implemented):
-    md1702-dfu upgrade foo.bin
+Upgrade to new firmware:
+    md1702-dfu upgrade <1702_v02_XYZ.bin>
 """)
 
 
