@@ -56,7 +56,7 @@ class recording(object):
 
     @staticmethod
     def get_size(dfu, block, warn=True):
-        data=dfu.to_str(dfu.upload_spi((block * 0x1000) + 0xffe, 2, crop=False, silent=True))
+        data=(dfu.upload_spi((block * 0x1000) + 0xffe, 2, crop=False, silent=True))
         if isinstance(b'',str):
             data=dfu.to_str(data)
         else:
@@ -162,7 +162,11 @@ class recording(object):
             print("Block 0x%04x, len=0x%04x" % (self.block, s1))
         if s1 == 0:
             return b""
-        data=dfu.to_str(dfu.upload_spi((self.block * 0x1000) + 0x200, min(s1, 0xdfe), crop=False, silent=True))
+        data=(dfu.upload_spi((self.block * 0x1000) + 0x200, min(s1, 0xdfe), crop=False, silent=True))
+        if isinstance(b'',str):
+            data=dfu.to_str(data)
+        else:
+            data=bytearray(data)
         i = 0
         for i in range(len(self.next_blocks)):
             bl = self.next_blocks[i]
@@ -171,9 +175,13 @@ class recording(object):
                 print("  '-- Next block 0x%04x, len=0x%04x" % (bl,s2))
             crop = (s2 == 0xffff)
             data2=dfu.to_str(dfu.upload_spi((bl * 0x1000), min(s2, 0xffe), crop=crop, silent=True))
+            if isinstance(b'',str):
+                data2=dfu.to_str(data)
+            else:
+                data2=bytes(data)
             data += data2
         self.data = data
-        return data
+        return bytes(data)
 
     def save(self, out_f, header=True):
         if header:
