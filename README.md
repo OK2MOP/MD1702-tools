@@ -22,7 +22,18 @@ Client Tools:
 an argument to show help.
 * `md1702-gfx` allows you to convert the boot logo graphics into an image editable in
 external tool and back, and to show the boot logo image extracted from the radio.
+* `md1702-rec` allows you to extract RAW DMR audio files, which can be decoded using
+a modified dsd code found in my repository
 * `linux_remove_usblp.sh` calls script `udev/scripts/unbind_bao1702.sh` with sudo.
+
+## Using md1702-rec ##
+Clone and build patched dsd from https://github.com/OK2MOP/dsd/ to be used with the
+recordings
+
+```
+md1702-rec readrec prefix # you may also add start date, e.g. "2019-01-02 22:00:11"
+for i in prefix*.dmr ; do path_to_built_dsd/dsd -w $i.wav -r $i ; done
+```
 
 ## Requirements: ##
 
@@ -35,7 +46,7 @@ external tool and back, and to show the boot logo image extracted from the radio
 * libusb 1.0: (0.4 does not work.)
   http://www.libusb.org/
 
-Optionally, if you want to specify date on command line in other formats 
+Optionally, if you want to specify date on command line in other formats
 
 * dateutil:
   https://github.com/dateutil/dateutil/
