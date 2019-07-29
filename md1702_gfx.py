@@ -85,6 +85,54 @@ def gfx_to_image(data):
             odata.append(blue)
     return bytes(odata)
 
+def read_file(infile):
+    if infile.split(".")[-1] == 'txt':
+        odata=bytearray()
+        with open(infile, 'r') as f:
+            data = f.read()
+            for line in data.split('\n'):
+                line = line.split('//')[0]
+                for val in line.split(','):
+                    val = val.strip().lower()
+                    if val == '' : continue
+                    x = (int(val, 16) if val[0:2] == '0x' else int(val))
+                    if python_v2:
+                        odata += chr(x)
+                    else:
+                        odata.append(x)
+            f.close()
+        #sys.stderr.write("Input text file\n")
+    else:
+        with open(infile, 'rb') as f:
+            odata = f.read()
+            f.close()
+    return bytes(odata)
+
+def write_file(outfile, hdr,data):
+    if outfile.split(".")[-1] == 'txt':
+        with open(outfile, 'w') as f:
+            i=0
+            for h in hdr: # Very convoluted format of the text file, probably not needed
+                if python_v2: h = ord(h)
+                if (i < 5):
+                    f.write("0x%02x," % h)
+                else:
+                    f.write("%i," % h)
+                i += 1
+            i=0
+            for d in data:
+                if i % 16 == 0: f.write('\n')
+                i += 1
+                if python_v2: d = ord(d)
+                f.write("0X%02X," % d)
+            f.write('\n')
+            f.close()
+    else:
+        with open(outfile, 'wb') as f:
+            f.write(hdr)
+            f.write(data)
+            f.close()
+
 def main():
     try:
         if len(sys.argv) == 4:
@@ -106,15 +154,10 @@ def main():
                         f.close()
                 if hdr is None:
                     hdr = logo_hdr
-                f = open(outfile, 'wb')
-                f.write(hdr)
                 data = gfx_from_image(im.tobytes())
-                f.write(data)
-                f.close()
-
+                write_file(outfile, hdr, data)
             elif sys.argv[1] == 'toimage':
-                with open(infile, 'rb') as f:
-                    data = f.read()
+                data=read_file(infile)
                 data1 = data[0:16]
                 data2 = data[16:gfx_size[1] * gfx_size[0] + 16]
                 if data1 != logo_hdr:
@@ -133,8 +176,7 @@ def main():
                 usage()
         elif len(sys.argv) == 3:
             if sys.argv[1] == 'show':
-                with open(sys.argv[2], 'rb') as f:
-                    data = f.read()
+                data=read_file(sys.argv[2])
                 data2 = data[16:gfx_size[1] * gfx_size[0] + 16]
                 if len(data2) != gfx_size[1] * gfx_size[0]:
                     print("The image size does not match, probably a different model, giving up")
