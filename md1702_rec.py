@@ -51,6 +51,7 @@ R_hdr = {
 
 class recording(object):
     FILE_HEADER = b".dmr"
+    FILE_EXT = ".dmr"
     #verbose = True
     verbose = False
 
@@ -176,9 +177,9 @@ class recording(object):
             crop = (s2 == 0xffff)
             data2=dfu.to_str(dfu.upload_spi((bl * 0x1000), min(s2, 0xffe), crop=crop, silent=True))
             if isinstance(b'',str):
-                data2=dfu.to_str(data)
+                data2=dfu.to_str(data2)
             else:
-                data2=bytes(data)
+                data2=bytes(data2)
             data += data2
         self.data = data
         return bytes(data)
@@ -254,7 +255,7 @@ def upload_recs(dfu, prefix, start, end, newer_than=None, scan=False):
             sys.stderr.write("Error: record block %x out of bounds, skipping\n" % orec_id)
         orec = orecs[orec_id]
         if orec.is_valid():
-            fn = prefix + str(orec) + str(orec.FILE_HEADER)
+            fn = prefix + str(orec) + str(orec.FILE_EXT)
             if newer_than is None or orec.is_newer_than(newer_than):
                 print("Saving record %s" % orec)
                 orec.read_data(dfu)
