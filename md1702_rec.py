@@ -226,7 +226,7 @@ def upload_recs(dfu, prefix, start, end, newer_than=None, scan=False):
     orecs = {}
     normal=[]
     print("Scanning recordings metadata")
-    for i in range(4,maxs):
+    for i in range(3,maxs):
         state = get_state(dfu, sblock + i)
         if state == 0xa5 or state == 0xa6:
             recs = get_recording_starts(dfu,sblock+i)
@@ -281,7 +281,7 @@ def show_record_info(dfu, start):
             print('  \'-- Allocated:  %i' % get_allocated_map(dfu,sblock+i).count(True))
     maxs=6
     if fwversion >= 22: maxs=9
-    for i in range(4,maxs):
+    for i in range(3,maxs):
         state = get_state(dfu, sblock + i)
         print('Mapping sector %i: %s (0x%02x)' % (i, Sector_state[state], state))
         if state == 0xa5 or state == 0xa6:
