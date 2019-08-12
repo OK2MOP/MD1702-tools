@@ -23,6 +23,8 @@ import os.path
 import usb.core
 
 from DM1702_DFU import DM1702_DFU, Versions
+from DM1702_codeplug import DATA_map
+from array import array
 
 # The tricky thing is that *TWO* different applications all show up
 # as this same VID/PID pair.
@@ -143,6 +145,52 @@ def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
     finally:
         f.close()
 
+def upload_codeplug(dfu, filename, start=0x1000, end=0x100000, crop=True):
+    """Dumps the SPI CODEPLUG flash data for given range."""
+    f = open(filename, 'wb')
+    if f is None:
+        sys.stderr.write("Writing to file %s failed, giving up\n" % filename)
+        return
+    try:
+        buff = array('B', [])
+        for addr in [0, 0x10, 0x20]:
+            dx = dfu.verify(Versions['Custom'], 0xa, addr)
+            buff += dx
+            buff += array('B', [0] * (0x10 - len(dx)))
+        sys.stdout.write('.')
+        sys.stdout.flush()
+        buff += array('B', [0] * (dfu.sector_size + 0x10 - len(buff)))
+        buff += dfu.upload(0, 0x1000)
+        buff = buff[:dfu.sector_size+0x110]
+        buff += array('B', [0] * (2*dfu.sector_size - len(buff)))
+        f.write(buff)
+        f.flush()
+        dfu.enter_spi_usb_mode()
+        sector_map = dfu.get_cp_map()
+        for idx in range(2,max(DATA_map)+1):
+            if DATA_map[idx] is None:
+                f.write(array('B', [0] * dfu.sector_size))
+            elif DATA_map[idx] in sector_map:
+                part = sector_map[DATA_map[idx]] * dfu.sector_size
+                data = dfu.upload_spi(part, dfu.sector_size, crop=False, silent=True)
+                sys.stdout.write('.')
+                sys.stdout.flush()
+                if data is None or len(data) != dfu.sector_size:
+                    sys.stderr.write("Getting data block 0x%02x failed, giving up\n" % part/dfu.sector_size)
+                    f.close()
+                    os.remove(filename)
+                    return
+                f.write(data)
+            else:
+                sys.stderr.write("Data block with ID 0x%02x does not exist, giving up\n" % DATA_map[idx])
+                f.close()
+                os.remove(filename)
+                return
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    finally:
+        f.close()
+
 def download(dfu, data, start, end):
     """Writes the SPI flash data for given range."""
     if (end-start+1 < len(data)):
@@ -181,8 +229,9 @@ Write a codeplug to the radio. Supported file types: RAW (NOT compatible with of
 Read a firmware and write it to a file.
     md1702-dfu readfw <firmware.bin>
 
-Read a RAW codeplug and write it to a file.
+Read a RAW codeplug and write it to a file (RAW with readcp, DATA CPS file with read)
     md1702-dfu readcp <codeplug.raw>
+    md1702-dfu read <codeplug.data>
 
 Display device version information
     md1702-dfu versions
@@ -224,6 +273,11 @@ def main():
                 dfu.enter_spi_usb_mode()
                 print("Dumping RAW codeplug.")
                 upload(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
+
+            elif sys.argv[1] == 'read' and sys.argv[2].split('.')[-1].lower() == "data":
+                dfu = init_dfu()
+                print("Dumping DATA CPS file.")
+                upload_codeplug(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
 
             elif sys.argv[1] == 'readlogo':
                 dfu = init_dfu()

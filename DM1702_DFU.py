@@ -356,6 +356,16 @@ class DM1702_DFU(object):
         if not self.verbose:
             print('')
 
+    def get_cp_map(self):
+        results = {}
+        for start in range (self.cps_start, self.cps_end, self.sector_size):
+            mark = self.upload_spi(start+0xfff, 1,1, crop=False, silent=True)
+            if mark is not None and len(mark) > 0 and mark[0] != 0xff and mark[0] != 0x00:
+                if (mark[0] in results): sys.stderr.write("Duplicate mark %02x\n", mark[0])
+                results[mark[0]] = int(start / self.sector_size)
+                assert int(start / self.sector_size) * self.sector_size == start
+        return results
+
     def send_text(self, what):
         #if self.verbose:
         #    print("Send: %s" % what)
@@ -410,7 +420,7 @@ class DM1702_DFU(object):
             raise Exception('Next command selection failed')
 
     def verify(self, command, rlength=0, addr=0, stringify=False):
-        self.send_data(Requests['VERIFY'], [rlength, (addr & 0xff), (addr >> 8), (command)]);
+        self.send_data(Requests['VERIFY'], [(addr >> 8), (addr & 0xff), rlength, (command)]);
         data=self.read(True)
         if data[0] != Requests['VERIFY'] :
             raise Exception('Invalid reply to VERIFY')
@@ -448,8 +458,8 @@ class DM1702_DFU(object):
         if data != Statuses['OK'] :
             raise Exception('System information mode setup failed')
         self.cps_start, self.cps_end = self.verify_addrs(Versions['Settings'])
-        self.verify(Versions['Custom'], 0, 0xa10)
-        if self.verify(Versions['Custom'], 0, 0xa20)[1] != 0xff:
+        self.verify(Versions['Custom'], 0xa, 0x10)
+        if self.verify(Versions['Custom'], 0xa, 0x20)[1] != 0xff:
             raise Exception('Verification of second datablock failed')
 
     def enter_spi_usb_mode(self):
