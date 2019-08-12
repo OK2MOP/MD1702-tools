@@ -20,6 +20,7 @@ import time
 
 import usb.core
 import os.path
+import usb.core
 
 from DM1702_DFU import DM1702_DFU, Versions
 
@@ -110,6 +111,25 @@ def upload_firmware(dfu, filename):
     finally:
         f.close()
 
+def upload_all(dfu, filename, start=0, end=0xFFFFFF):
+    """Dumps all SPI flash data, stores even partial results."""
+    f = open(filename, 'wb')
+    try:
+        for part in range(start, end, dfu.sector_size):
+            #print ("Part %06x end %06x" % (part,part+dfu.sector_size))
+            data = dfu.upload_spi(part, dfu.sector_size, crop=False, silent=True)
+            if f is not None:
+                f.write(data)
+                f.flush()
+                sys.stdout.write('.')
+                sys.stdout.flush()
+            else:
+                hexdump(data)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    finally:
+        f.close()
+
 def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
     """Dumps the SPI flash data for given range."""
     f = open(filename, 'wb')
@@ -178,7 +198,8 @@ Write voice data/HZK font/Boot image and from a file (no checking of correct fil
     md1702-dfu writelogo <bootlogo.bin>
 
 Read a full SPI flash dump including a codeplug and write it to a file (very slow, ~1h)
-    md1702-dfu readspi <spiflash.bin>
+    md1702-dfu readspi <spiflash.bin> [start [end]]
+    # start/end are hexadecimal offsets
 
 Dump the config block from Flash memory.
     md1702-dfu readcfg <cfg_filename.bin>
@@ -199,14 +220,12 @@ def main():
     try:
         if len(sys.argv) == 3:
             if sys.argv[1] == 'readcp':
-                import usb.core
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
                 print("Dumping RAW codeplug.")
                 upload(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
 
             elif sys.argv[1] == 'readlogo':
-                import usb.core
                 dfu = init_dfu()
                 print("Dumping Boot logo raw image.")
                 start, end = dfu.verify_addrs(Versions['Logo']) #logo offsets are not available in SPI_USB mode
@@ -214,7 +233,6 @@ def main():
                 upload(dfu, sys.argv[2], start, end, crop=False)
 
             elif sys.argv[1] == 'readfont':
-                import usb.core
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
                 print("Dumping HZK font data.")
@@ -222,7 +240,6 @@ def main():
                 upload(dfu, sys.argv[2], start, end)
 
             elif sys.argv[1] == 'readvoice':
-                import usb.core
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
                 print("Dumping Voice data.")
@@ -230,30 +247,25 @@ def main():
                 upload(dfu, sys.argv[2], start, end)
 
             elif sys.argv[1] == 'readspi':
-                import usb.core
                 print("Dumping 16MB of RAW SPI flash data, please be patient, it takes an hour.")
                 dfu = init_dfu()
                 dfu.enter_spi_usb_mode()
-                upload(dfu, sys.argv[2])
+                upload_all(dfu, sys.argv[2])
                 print('Read complete')
 
             elif sys.argv[1] == 'readfw':
-                import usb.core
                 dfu = init_dfu()
                 upload_firmware(dfu, sys.argv[2])
 
             elif sys.argv[1] == 'readcfg':
-                import usb.core
                 dfu = init_dfu()
                 upload_config(dfu, sys.argv[2])
 
             elif sys.argv[1] == 'settime':
-                import usb.core
                 dfu = init_dfu(dfu_mode=False)
                 dfu.set_time(sys.argv[2])
 
             elif sys.argv[1] == 'writelogo':
-                import usb.core
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu()
@@ -263,7 +275,6 @@ def main():
                     download(dfu, data, start, end)
 
             elif sys.argv[1] == 'writefont':
-                import usb.core
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu()
@@ -273,7 +284,6 @@ def main():
                     download(dfu, data, start, end)
 
             elif sys.argv[1] == 'writevoice':
-                import usb.core
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu()
@@ -297,7 +307,6 @@ def main():
                     download(dfu, data, dfu.cps_start, dfu.cps_end)
 
             elif sys.argv[1] == "upgrade":
-                import usb.core
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     dfu = init_dfu(dfu_mode=False)
@@ -308,27 +317,39 @@ def main():
 
         elif len(sys.argv) == 2:
             if sys.argv[1] == 'settime':
-                import usb.core
                 dfu = init_dfu(dfu_mode=False)
                 dfu.set_time()
 
             elif sys.argv[1] == 'reboot':
-                import usb.core
                 dfu = init_dfu()
                 dfu.reboot()
 
             elif sys.argv[1] == 'versions':
-                import usb.core
                 dfu = init_dfu()
                 display_versions(dfu)
 
             elif sys.argv[1] == "upgrade_check":
-                import usb.core
                 dfu = init_dfu(dfu_mode=False)
                 dfu.enter_bootloader_mode()
                 print ("Please turn off the radio now.")
             else:
                 usage()
+
+        elif len(sys.argv) in [4,5]:
+            if sys.argv[1] == 'readspi':
+                try:
+                    start=int(sys.argv[3], 16)
+                    end=int(sys.argv[4], 16) if len(sys.argv) == 5 else 0xffffff
+                except:
+                    usage()
+                    exit(1)
+                print("Dumping partial RAW SPI flash data from 0x%06x to 0x%06x, please be patient, it takes ~%.2f minutes." %\
+                      (start, end, (end - start) * 0.0000032))
+                dfu = init_dfu()
+                dfu.enter_spi_usb_mode()
+                upload_all(dfu, sys.argv[2],start, end)
+                print('Read complete')
+
         else:
             usage()
     except (RuntimeError, Exception) as e:
