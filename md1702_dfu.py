@@ -43,9 +43,6 @@ verbose_err = True
 # ram_offset = 0x20000000
 # bootloader_size   = 0x00004000
 
-def download_codeplug(dfu, data):
-    return
-
 def hexdump(string):
     """God awful hex dump function for testing."""
     buf = ""
@@ -145,8 +142,8 @@ def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
     finally:
         f.close()
 
-def upload_codeplug(dfu, filename, start=0x1000, end=0x100000, crop=True):
-    """Dumps the SPI CODEPLUG flash data for given range."""
+def upload_codeplug(dfu, filename):
+    """Dumps the SPI CODEPLUG data from SPI flash, searches in given range."""
     f = open(filename, 'wb')
     if f is None:
         sys.stderr.write("Writing to file %s failed, giving up\n" % filename)
@@ -167,6 +164,8 @@ def upload_codeplug(dfu, filename, start=0x1000, end=0x100000, crop=True):
         f.flush()
         dfu.enter_spi_usb_mode()
         sector_map = dfu.get_cp_map()
+        sys.stdout.write('+')
+        sys.stdout.flush()
         for idx in range(2,max(DATA_map)+1):
             if DATA_map[idx] is None:
                 f.write(array('B', [0] * dfu.sector_size))
@@ -190,6 +189,59 @@ def upload_codeplug(dfu, filename, start=0x1000, end=0x100000, crop=True):
         sys.stdout.flush()
     finally:
         f.close()
+
+def download_codeplug(dfu, filename, calib=False):
+    """Uploads the SPI CODEPLUG data to flash for given range."""
+    f = open(filename, 'rb')
+    if f is None:
+        sys.stderr.write("Reading from data file %s failed, giving up\n" % filename)
+        return
+    try:
+        data = array('B', f.read())
+        if len(data) != (max(DATA_map)+1) * dfu.sector_size:
+            print('According to the file size, this is not the official CPS DATA codeplug, aborting.')
+            return
+        dfu.enter_spi_usb_mode()
+        sector_map = dfu.get_cp_map()
+        for sec in range(2,max(DATA_map)+1):
+          pos = (sec * dfu.sector_size) + 0xfff
+          entry = data[pos]
+          if sec in DATA_map:
+              if DATA_map[sec] is None:
+                continue
+              elif DATA_map[sec] != entry:
+                if sec == 0x4:
+                    print('Sector 0x%02x mark does not match (0x%02x != 0x%02x), known CPS bug detected, fixing.' % (sec, DATA_map[sec], entry))
+                    #Fix channel name string
+                    data[pos-1] = 0x0
+                    data[pos] = DATA_map[sec]
+                else:
+                    print('Sector 0x%02x mark does not match (0x%02x != 0x%02x), aborting.' % (sec, DATA_map[sec], entry))
+                    return
+              elif DATA_map[sec] not in sector_map:
+                print("Data block with ID 0x%02x does not exist on device, aborting." % DATA_map[idx])
+                return
+              #else:
+              #  print("Sector 0x%02x (0x%02x) OK" % (sec,entry))
+          elif entry != 0x0:
+              print('Sector mark for unlisted sector 0x%02x is not 0 (0x%02x), aborting.' % (sec, entry))
+              return
+        sys.stdout.write('+')
+        sys.stdout.flush()
+
+        for idx in range(2 if calib else 3 ,max(DATA_map)+1):
+            if DATA_map[idx] is None:
+                continue
+            part = sector_map[DATA_map[idx]] * dfu.sector_size
+            #print("Uploading data[0x%06x:0x%06x] to address 0x%06x length=0x%04x" % (idx*dfu.sector_size,(idx+1)*dfu.sector_size,part,dfu.sector_size))
+            dfu.download_spi(part, data[idx*dfu.sector_size:(idx+1)*dfu.sector_size], dfu.sector_size, silent=True)
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    finally:
+        f.close()
+
 
 def download(dfu, data, start, end):
     """Writes the SPI flash data for given range."""
@@ -223,8 +275,9 @@ def usage():
     print("""
 Usage: md1702-dfu <command> <arguments>
 
-Write a codeplug to the radio. Supported file types: RAW (NOT compatible with official CPS editor!)
+Write a codeplug to the radio. Supported file types: RAW (with writecp), DATA file (with write)
     md1702-dfu writecp <codeplug.raw>
+    md1702-dfu write <codeplug.data>
 
 Read a firmware and write it to a file.
     md1702-dfu readfw <firmware.bin>
@@ -277,7 +330,7 @@ def main():
             elif sys.argv[1] == 'read' and sys.argv[2].split('.')[-1].lower() == "data":
                 dfu = init_dfu()
                 print("Dumping DATA CPS file.")
-                upload_codeplug(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
+                upload_codeplug(dfu, sys.argv[2])
 
             elif sys.argv[1] == 'readlogo':
                 dfu = init_dfu()
@@ -349,11 +402,16 @@ def main():
                     start, end = dfu.verify_addrs(Versions['Voices'])
                     download(dfu, data, start, end)
 
+            elif sys.argv[1] in ['write', 'writecal'] and sys.argv[2].split('.')[-1].lower() == "data":
+                dfu = init_dfu()
+                print("Writing CPS DATA.")
+                download_codeplug(dfu, sys.argv[2], sys.argv[1] == 'writecal')
+
             elif sys.argv[1] == 'writecp':
                 with open(sys.argv[2], 'rb') as f:
                     data = f.read()
                     if len(data) == 0x3C000:
-                        print('According to the size, this is official codeplug, which is presently not supported. Aborting.')
+                        print('According to the size, this is official codeplug, use write command instead. Aborting.')
                         return
                     dfu = init_dfu()
                     dfu.enter_spi_usb_mode()

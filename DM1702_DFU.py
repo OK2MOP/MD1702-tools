@@ -325,7 +325,7 @@ class DM1702_DFU(object):
         else:
             return array('B',data)
 
-    def download_spi(self, address, data, max_length=0, delta=None, delay=None):
+    def download_spi(self, address, data, max_length=0, delta=None, delay=None, silent=False):
         length = len(data)
         if (max_length != 0 and max_length < length):
             raise Exception('Uploaded data size %i is larger than maximum allowed size %i' % (len(data), end-start+1))
@@ -340,7 +340,7 @@ class DM1702_DFU(object):
         while address + length > caddr :
           if self.verbose:
               print("Download request at 0x%06x, l=%i" % (caddr, l))
-          elif (caddr % self.sector_size) == 0:
+          elif (caddr % self.sector_size) == 0 and not silent:
               sys.stdout.write('.')
               sys.stdout.flush()
           if (address+length-caddr) < self.delta :
@@ -353,7 +353,7 @@ class DM1702_DFU(object):
           pos += l
           if delay is not None:
               time.sleep(delay)
-        if not self.verbose:
+        if not self.verbose and not silent:
             print('')
 
     def get_cp_map(self):

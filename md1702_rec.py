@@ -340,7 +340,7 @@ class FileDFU(object):
         if (what == Versions['FWVersion']):
             return 'V02.02.0' + str(self.version)
         else:
-            return '' #No other verify shoulr be called
+            return '' #No other verify should be called
 
 def usage():
     print("""
