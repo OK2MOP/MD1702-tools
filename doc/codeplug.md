@@ -16,7 +16,7 @@ Block ID is stored in last byte of each sector, it must match ID of saved block 
 * 0x06 - HIDDEN by default: Phone systems (data block 14)
 * 0x0a - Message templates (data block 10)
 * 0x0b - Contacts indices for fast contact lookup - record allocation map, alphabetic and numeric index (data block 7)
-* 0x11 - RX and scan lists, systems, lone worker, privacy (data block 8, 12)
+* 0x11 - RX lists, systems, lone worker, privacy (data block 8)
 * 0x12 - RX lists 2 (data block 12)
 * 0x13 - Scan lists (data block 11)
 * 0x16-0x22 - Channel data (data blocks 3, 15-26)
@@ -33,19 +33,19 @@ Block ID is stored in last byte of each sector, it must match ID of saved block 
 * 0x45-0x56 - Zone definitions (data blocks 6, 43-59)
 
 ### Extra block IDs not stored in data files ###
-* 0x08 - Physical block 0xC2 (0xC1 in codeplug memory area now) - received SMS messages
-* 0x09 - Physical block 0xC1 (0xC0 in codeplug memory area now) - sent SMS messages
-* 0x0e -
-* 0x0f -
-* 0x10 -
-* 0x14 - Draft SMS messages?
+* 0x08, 0x2d-0x32 - Physical block 0xC2 (0xC1 in codeplug memory area now) - received SMS messages
+* 0x09, 0x33-0x38? - Physical block 0xC1 (0xC0 in codeplug memory area now) - sent SMS messages
+* 0x0e - Missed calls
+* 0x0f - Answered calls?
+* 0x10 - Outgoing calls
+* 0x14 - Draft SMS messages - *broken, works as circular buffer if more than 12 messages*
 
 ### Unused block ID ranges ###
 * 0x05
 * 0x07
 * 0x0c-0x0d
 * 0x15
-* 0x2d-0x3e
+* 0x39-0x3e
 * 0x56-0xa4
 * 0xa5-0xa6 - used in Audio recordings section to mark an active block, probably not to be considered
 * 0xa7-0xfe
