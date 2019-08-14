@@ -36,7 +36,7 @@ Block ID is stored in last byte of each sector, it must match ID of saved block 
 * 0x08, 0x2d-0x32 - Physical block 0xC2 (0xC1 in codeplug memory area now) - received SMS messages
 * 0x09, 0x33-0x38? - Physical block 0xC1 (0xC0 in codeplug memory area now) - sent SMS messages
 * 0x0e - Missed calls
-* 0x0f - Answered calls?
+* 0x0f - Answered calls
 * 0x10 - Outgoing calls
 * 0x14 - Draft SMS messages - *broken, works as circular buffer if more than 12 messages*
 
