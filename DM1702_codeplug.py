@@ -58,13 +58,13 @@ class DM1702_messages(object):
     def __repr__(self):
         return str(self.messages)
 
-    def __get__(self, index):
+    def __getitem__(self, index):
         return self.messages[index]
 
     def append(self, message):
         self.messages.append(message)
 
-    def remove(self, index):
+    def __delitem__(self, index):
         del self.messages[index]
 
     def __str__(self):
@@ -92,6 +92,11 @@ class DM1702_codeplug(object):
     def __init__(self, data):
         self.data=[ord(x) for x in data] if isinstance(data[0],str) else data
         self.marks = self.get_data_map(self.data)
+        self.channels = None
+        self.zones = None
+        self.scan_lists = None
+
+        self.load_contacts()
 
     def get_block(self, bid):
         #print("Get block id=0x%02x, start = 0x%06x, end = 0x%06x" % (bid, bid * self.sector_size, (bid+1) * self.sector_size))
@@ -126,3 +131,39 @@ class DM1702_codeplug(object):
             elif DATA_chains[mt2][0] in self.marks:
                 result[mtype] = DM1702_messages(self.get_data(mt2), mtype, deleted)
         return result
+
+    def get_cbc_map(self, mapping, ch_mode=True):
+        data = []
+        for i in range(0, int(len(mapping)/2)):
+            if ch_mode:
+                cidx = ((mapping[2*i] >> 4) << 8) | (mapping[2*i+1])
+            else:
+                cidx = mapping[2*i] | (mapping[2*i+1] << 8)
+
+            if cidx == 0xffff or cidx == 0xfff:
+                continue
+            elif cidx == 0:
+                cid = None
+            elif cidx <= len(self.contacts.clist):
+                cid = float(self.contacts.clist[cidx-1])
+                #cstr = str(self.contacts.clist[cidx-1])
+            else:
+                raise Exception("Contact ID %i out of range" % cidx)
+            #print ("C %i -> %s/%i @%i" % (i, cstr, cid, cidx))
+            data.append(cid)
+        return data
+
+    def load_contacts(self):
+        cm = self.get_data('Contact_meta')
+        cd = self.get_data('Contact_data')
+        self.contacts = DM1702_contacts(cd, cm)
+
+        self.btn_map = self.get_cbc_map(self.get_data('Buttons'), False)
+        self.c_c_map = self.get_cbc_map(self.get_data('Channel_contact'), True)
+
+    def get_msg_templates(self):
+        return self.get_messages('templates')['templates']
+
+    def get_contacts(self):
+        return self.contacts
+

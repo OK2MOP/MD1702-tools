@@ -111,6 +111,7 @@ contactFormats = {
 class DM1702_contact(object):
     sort_by = callSorting['callSign']
     csv_idx = 0
+    contact_len = 0x18
 
     def __init__(self, cid, call, name=None, country=None, ctype = None):
         self.call=call
@@ -152,10 +153,11 @@ class DM1702_contact(object):
 #
     @staticmethod
     def from_MD_record(data):
-        call, tcid = unpack('<2x16sxL3x', data)
-        call = call.decode().rstrip('\x00')
+        call, tcid = unpack('<2x16sxLx', data)
+        call = call.decode(errors="ignore").rstrip('\x00')
         cid = tcid & 0xffffff
         ctype = (tcid >> 24) & 0xf
+        #print(call, cid, ctype)
         return DM1702_contact(cid, call, ctype = ctype)
 
     # This will be probably slow :-(
@@ -174,6 +176,9 @@ class DM1702_contact(object):
     def __str__(self):
         return self.call
 
+    def __float__(self):
+        return self.cid + (0.0 if self.type == 3 else 0.1)
+
     def __int__(self):
         return self.cid
 
@@ -188,13 +193,15 @@ class DM1702_contact(object):
             s1 = str(self)
         elif isinstance(other, int):
             s1 = int(self)
+        elif isinstance(other, float):
+            s1 = float(self)
         else:
             return self.cid == other.cid and self.call == other.call and self.type == other.type
         return s1 == other
 
     def to_MD_record(self):
-        return pack('<2s16scL3s', b'\xff\xff', self.call[:16] if b"" == "" else bytes(self.call[:16],"ascii"),
-                 b'\xff', (self.type << 24) | self.cid, b'\xff\xff\xff')
+        return pack('<2s16scLc', b'\xff\xff', self.call[:16] if b"" == "" else bytes(self.call[:16],"utf-8"),
+                 b'\xff', (self.type << 24) | self.cid, b'\xff')
 
     def to_csv(self):
         return ("%i,%s,%s,,,,%s" % (self.cid, self.call,
@@ -214,28 +221,77 @@ class DM1702_contact(object):
         return ("%i,%s,%s,%i" % (self.csv_idx, self.call, MDCallNames[self.type], self.cid))
 
     def __repr__(self):
-        return repr({ 'id' : self.cid, 'call' : self.call })
+        return repr({ 'id' : self.cid, 'call' : self.call, 'type' : self.type })
 
 class DM1702_contacts(object):
-    def __init__(self, data=None):
+    def __init__(self, contact_data=None, contact_map=None):
         self.clist = []
         self.index = 0
         self.str_map = {}
         self.int_map = {}
+        self.float_map = {}
+        if contact_data is not None and contact_map is not None:
+            self.import_CP(contact_data, contact_map)
 
-    def append(self, DM1702_contact):
+    def append(self, contact):
         idx = len(self.clist)
-        self.clist.append(DM1702_contact)
-        self.str_map[str(DM1702_contact)] = self.int_map[int(DM1702_contact)] = idx
+        if float(contact) in self.float_map: #Duplicate contact DMR ID not allowed
+            return
+        elif str(contact) in self.str_map:
+            if self.clist[self.str_map[str(contact)]] == contact:
+                return #Duplicate contact entry not allowed
+            elif float(contact) not in self.float_map:
+                #Duplicate call with different ID - allowed with different label
+                i = 1
+                call = contact.call[:13]
+                while True:
+                    call2 = "%s-%i" % (call, i)
+                    i += 1
+                    if call2 not in self.str_map:
+                        contact.call = call2
+                        break
+                    if self.clist[self.str_map[str(contact)]] == contact:
+                       return #If already inserted, skip it
+        self.clist.append(contact)
+        self.str_map[str(contact)] = self.int_map[int(contact)] = self.float_map[float(contact)] = idx
 
     def sort(self, by=None):
         self.str_map = {}
         self.int_map = {}
+        self.float_map = {}
         if by is not None: DM1702_contact.set_sort(by)
         self.clist.sort()
         for idx in range(0,len(self.clist)) :
             ct = self.clist[idx]
-            self.str_map[str(ct)] = self.int_map[int(ct)] = idx
+            self.str_map[str(ct)] = self.int_map[int(ct)] = self.float_map[float(ct)] = idx
+
+    def __getitem__(self, what):
+        if isinstance(what, str) and what in self.str_map:
+            return self.clist[self.str_map[what]]
+        elif isinstance(what, int) and what in self.int_map:
+            return self.clist[self.int_map[what]]
+        elif isinstance(what, float) and what in self.float_map:
+            return self.clist[self.float_map[what]]
+        else:
+            return None
+    def __len__(self):
+        return len(self.clist)
+
+    def import_CP(self, contact_data, contact_map):
+        cnt, gr_calls, all_call_ind = unpack("<HHB11x", bytes(bytearray(contact_map[0:0x10])))
+        bmap=DM1702_util.get_data_bitmap(contact_map[0x10:0x100]) #Broken
+        indices1 = unpack("<800H", bytes(bytearray(contact_map[0x100:0x740])))
+        indices1 = [ (x & 0xfff) for x in indices1 if x != 0xF000]
+        i = 0
+        c = 0
+        #print("Count: %i, group: %i, All: %i, Alloc: %i, Ind: %i" % (cnt, gr_calls, all_call_ind, bmap.count(True), len(indices1)))
+        for ent in range(0, cnt):
+            if (ent+1) in indices1:
+                cont = DM1702_contact.from_MD_record(bytes(\
+                    bytearray(contact_data[i:i+DM1702_contact.contact_len])))
+                self.append(cont)
+                c += 1
+            i += DM1702_contact.contact_len
 
     def load(self, infile, ftype="auto"):
         import csv
