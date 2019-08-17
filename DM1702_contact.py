@@ -200,21 +200,8 @@ class DM1702_contact(object):
         return s1 == other
 
     def to_MD_record(self):
-        return pack('<2s16scLc', b'\xff\xff', self.call[:16] if b"" == "" else bytes(self.call[:16],"utf-8"),
-                 b'\xff', (self.type << 24) | self.cid, b'\xff')
-
-    def to_csv(self):
-        return ("%i,%s,%s,,,,%s" % (self.cid, self.call,
-                                    self.name if self.name is not None else "",
-                                    self.country if self.country is not None else "")
-               )
-
-    def to_dmrid_csv(self):
-        DM1702_contact.csv_idx += 1
-        return ("%i;%i;%s;%s;;%s;" % (DM1702_contact.csv_idx, self.cid, self.call,
-                                    self.name if self.name is not None else "",
-                                    self.country if self.country is not None else "")
-               )
+        return pack('<2s16scLc', b'\xff\xff', str(self.call[:16]) if b"" == "" else bytes(self.call[:16],"utf-8"), b'\xff', (self.type << 24) | self.cid, b'\xff')
+        #return pack('<2x16sxLx', str(self.call[:16]) if b"" == "" else bytes(self.call[:16],"utf-8"), (self.type << 24) | self.cid)
 
     def to_cps_csv(self):
         DM1702_contact.csv_idx += 1
@@ -224,6 +211,8 @@ class DM1702_contact(object):
         return repr({ 'id' : self.cid, 'call' : self.call, 'type' : self.type })
 
 class DM1702_contacts(object):
+    max_internal_contacts = 800
+
     def __init__(self, contact_data=None, contact_map=None):
         self.clist = []
         self.index = 0
@@ -265,33 +254,91 @@ class DM1702_contacts(object):
             ct = self.clist[idx]
             self.str_map[str(ct)] = self.int_map[int(ct)] = self.float_map[float(ct)] = idx
 
-    def __getitem__(self, what):
+    def get_index(self, what):
         if isinstance(what, str) and what in self.str_map:
-            return self.clist[self.str_map[what]]
+            return self.str_map[what]
         elif isinstance(what, int) and what in self.int_map:
-            return self.clist[self.int_map[what]]
+            return self.int_map[what]
         elif isinstance(what, float) and what in self.float_map:
-            return self.clist[self.float_map[what]]
+            return self.float_map[what]
+        elif isinstance(what, DM1702_contact) and float(what) in self.float_map:
+            return self.float_map[float(what)]
         else:
             return None
+
+    def __getitem__(self, what):
+        idx = self.get_index(what)
+        return None if idx is None else self.clist[idx]
+
     def __len__(self):
         return len(self.clist)
 
     def import_CP(self, contact_data, contact_map):
         cnt, gr_calls, all_call_ind = unpack("<HHB11x", bytes(bytearray(contact_map[0:0x10])))
-        bmap=DM1702_util.get_data_bitmap(contact_map[0x10:0x100]) #Broken
+        bmap=DM1702_util.get_data_bitmap(contact_map[0x10:0x74])
         indices1 = unpack("<800H", bytes(bytearray(contact_map[0x100:0x740])))
         indices1 = [ (x & 0xfff) for x in indices1 if x != 0xF000]
-        i = 0
-        c = 0
+        i = c = 0
         #print("Count: %i, group: %i, All: %i, Alloc: %i, Ind: %i" % (cnt, gr_calls, all_call_ind, bmap.count(True), len(indices1)))
-        for ent in range(0, cnt):
-            if (ent+1) in indices1:
+        ##Previous version of code checking indices instead of bitmap
+        #for ent in range(0, cnt):
+        #    if (ent+1) in indices1:
+        #        cont = DM1702_contact.from_MD_record(bytes(\
+        #            bytearray(contact_data[i:i+DM1702_contact.contact_len])))
+        #        self.append(cont)
+        #        c += 1
+        #    i += DM1702_contact.contact_len
+        for ent in range(0, len(bmap)):
+            if bmap[ent]:
                 cont = DM1702_contact.from_MD_record(bytes(\
                     bytearray(contact_data[i:i+DM1702_contact.contact_len])))
                 self.append(cont)
-                c += 1
             i += DM1702_contact.contact_len
+
+    def export_CP(self):
+        contact_data = []
+        cnt = len(self)
+        if cnt > self.max_internal_contacts:
+            cnt = self.max_internal_contacts
+        gr_calls = all_call_ind = 0
+        for c in self.clist:
+            if c.type == callTypes['group']:
+                gr_calls += 1
+            elif c.type == callTypes['all']:
+                all_call_ind = 1
+        contact_map = pack("<HHB11s", cnt, gr_calls, all_call_ind, b'\xff' * 11)
+        contact_map += b'\x00' * int(cnt / 8)
+        contact_map += [b'\xff',b'\xfe',b'\xfc',b'\xf8',b'\xf0',b'\xe0',b'\xc0',b'\x80',b'\x00'][cnt % 8]
+        contact_map = DM1702_util.pad_data(contact_map, 0x76)
+        contact_map += b'\x00\x00\xff\xff\xff\xff\xfe' + (b'\xff' * (0x100-0x7d))
+        skipped = skipped2 = 0
+        #Add Alphabetic indices
+        for sid in sorted(self.str_map):
+            if self.str_map[sid] < self.max_internal_contacts:
+                ctact = self.clist[self.str_map[sid]]
+                item = (self.str_map[sid]+1) | (ctact.type << 12)
+                contact_map += bytes(bytearray([item & 0xff, item >> 8]))
+            else:
+                skipped += 1
+        contact_map += b'\x00\xf0' * int((0x740 - len(contact_map))/2)
+
+        #Add Numeric indices
+        for sid in sorted(self.float_map):
+            if self.float_map[sid] < self.max_internal_contacts:
+                ctact = self.clist[self.float_map[sid]]
+                item = (self.float_map[sid]+1) | (ctact.type << 12)
+                contact_map += bytes(bytearray([item & 0xff, item >> 8]))
+            else:
+                skipped2 += 1
+        assert skipped == skipped2
+
+        contact_map += b'\x00\xf0' * int((0xd80 - len(contact_map))/2)
+        contact_map = [x for x in contact_map]
+
+        contact_data = []
+        for c in self.clist:
+            contact_data += c.to_MD_record()
+        return contact_map, contact_data, skipped
 
     def load(self, infile, ftype="auto"):
         import csv

@@ -90,7 +90,7 @@ class DM1702_codeplug(object):
         return results
 
     def __init__(self, data):
-        self.data=[ord(x) for x in data] if isinstance(data[0],str) else data
+        self.data=[ord(x) for x in data] if isinstance(data[0],str) else [x for x in data]
         self.marks = self.get_data_map(self.data)
         self.channels = None
         self.zones = None
@@ -102,6 +102,21 @@ class DM1702_codeplug(object):
         #print("Get block id=0x%02x, start = 0x%06x, end = 0x%06x" % (bid, bid * self.sector_size, (bid+1) * self.sector_size))
         return self.data[bid * self.sector_size:(bid+1) * self.sector_size]
 
+    def set_block_data(self, bid, data, offset):
+        start = bid * self.sector_size + offset
+        #print("Set block id=0x%02x, start = 0x%06x, end = 0x%06x" % (bid, start, start+len(data)))
+        assert len(self.data[start:start+len(data)]) == len(data)
+        for i in range(0, len(data)):
+            self.data[start +i] = data[i]
+        #self.data[start:start+len(data)] == data
+
+    def get_data_size(self, block_ids):
+        chains = DATA_ranges[block_ids]
+        total = 0
+        for chain in chains:
+            total += max(chain) - min(chain) + 1
+        return total
+
     def get_data(self, block_ids):
         chains = DATA_chains[block_ids]
         ranges = DATA_ranges[block_ids]
@@ -111,12 +126,34 @@ class DM1702_codeplug(object):
             if chains[i] not in self.marks:
                 if i == 0:
                     sys.stderr.write("Block with ID 0x%02x not found, returning empty data.\n" % chains[i])
-                data += ([0xff] * (ranges[i][-1]-ranges[i][0]+1))
+                #data += ([0xff] * (ranges[i][-1]-ranges[i][0]+1))
+                data += ([0xff] * (max(ranges[i])-min(ranges[i])+1))
                 break
             else:
-                data += self.get_block(self.marks[chains[i]])[ranges[i][0]:ranges[i][-1]+1]
+                #data += self.get_block(self.marks[chains[i]])[ranges[i][0]:ranges[i][-1]+1]
+                data += self.get_block(self.marks[chains[i]])[min(ranges[i]):max(ranges[i])+1]
         #print("Get Data len=0x%06x, count=%i" % (len(data), len(ranges)))
         return data
+
+    def set_data(self, block_ids, data):
+        chains = DATA_chains[block_ids]
+        ranges = DATA_ranges[block_ids]
+        assert len(ranges) == len(chains)
+
+        if len(data) > 0 and isinstance(data[0], str): # Python2 normalization - move to data setting
+            data = [ ord(x) for x in data ]
+
+        skip = 0
+        for i in range(0,len(ranges)):
+            rlen = (max(ranges[i])-min(ranges[i])+1)
+            rmin = min(ranges[i])
+            if chains[i] not in self.marks:
+                sys.stderr.write("Block with ID 0x%02x not found adding to the end (This won't work for CPS data file)!\n" % chains[i])
+                self.data += [0xff] * (self.sector_size-1) + [chains[i]]
+                self.marks = self.get_data_map(self.data)
+            bid = self.marks[chains[i]]
+            self.set_block_data(bid, data[skip:rlen+skip+1], rmin)
+            skip += rlen
 
     def get_messages(self, mtypes='all', deleted=False):
         result = {}
@@ -144,14 +181,47 @@ class DM1702_codeplug(object):
                 continue
             elif cidx == 0:
                 cid = None
+                contact = None
             elif cidx <= len(self.contacts.clist):
-                cid = float(self.contacts.clist[cidx-1])
+                #cid = float(self.contacts.clist[cidx-1])
                 #cstr = str(self.contacts.clist[cidx-1])
+                contact = self.contacts.clist[cidx-1]
             else:
-                raise Exception("Contact ID %i out of range" % cidx)
+                sys.stderr.write("Contact %c_%i does not exist, setting to None\n" % ('C' if ch_mode else 'B', i))
+                contact = None
             #print ("C %i -> %s/%i @%i" % (i, cstr, cid, cidx))
-            data.append(cid)
+            data.append(contact)
         return data
+
+    def set_cbc_map(self, data, dlen, ch_mode=True):
+        mapping = []
+        idx=0
+        for contact in data:
+            idx += 1
+            if contact is None:
+                mapping += [0, 0]
+                continue
+            cid = float(contact)
+            cpos = self.contacts.get_index(cid)
+            if cpos is None:
+                self.contacts.append(contact)
+                cpos = self.contacts.get_index(cid) + 1 # Contacts numbered from 1
+            cpos += 1 # Contacts numbered from 1
+            if cpos >= self.contacts.max_internal_contacts:
+                sys.stderr.write("Contact %s @ %c_%i placed beyond maximum allowed position, setting to None\n" % (str(contact),'C' if ch_mode else 'B', idx))
+                mapping += [0, 0]
+
+            if ch_mode:
+                cidi = int(cid)
+                mapping += [(cpos >> 8) << 4 | 0 if cidi == cid else 1, cpos & 0xff]
+                # 1/0 indication seems not to be provided in CPS editor, only on radio?
+            else:
+                mapping += [cpos & 0xff, cpos >> 8]
+        if len(mapping) < dlen:
+            mapping += [0xff] * (dlen - len(mapping))
+        elif dlen < len(mapping):
+            sys.stderr.write("Warning: Contact mapping data too large (%i < %i)\n" % (dlen, len(mapping)))
+        return mapping
 
     def load_contacts(self):
         cm = self.get_data('Contact_meta')
@@ -160,6 +230,18 @@ class DM1702_codeplug(object):
 
         self.btn_map = self.get_cbc_map(self.get_data('Buttons'), False)
         self.c_c_map = self.get_cbc_map(self.get_data('Channel_contact'), True)
+
+    def save_contacts(self):
+        cmap, cdata, skipped = self.contacts.export_CP()
+        if skipped > 0:
+            sys.stderr.write("Warning: Contact data too large, %i contacts ignored" % (skipped))
+        btn=self.set_cbc_map(self.btn_map, self.get_data_size('Buttons'), False)
+        cc=self.set_cbc_map(self.c_c_map, self.get_data_size('Channel_contact'), True)
+
+        self.set_data('Contact_meta', cmap)
+        self.set_data('Contact_data', cdata)
+        self.set_data('Buttons', btn)
+        self.set_data('Channel_contact', cc)
 
     def get_msg_templates(self):
         return self.get_messages('templates')['templates']

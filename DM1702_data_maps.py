@@ -77,9 +77,18 @@ class DM1702_util(object):
         for c in data:
             if isinstance(c,str):
                 c = ord(c)
-            for j in range(7):
+            for j in range(8):
                 odata.append(((c >> j) & 0x1 == bit))
         return odata
+
+    @staticmethod
+    def pad_data(data, plen):
+        if len(data) < plen:
+            if isinstance(data, bytes):
+                data += b'\xff' * (plen - len(data))
+            elif isinstance(data[0], int) :
+                data += [0xff] * (plen - len(data))
+        return data
 
     @staticmethod
     def dtrim(data):
