@@ -61,8 +61,9 @@ class DM1702_messages(object):
                 if dmr_id != 0:
                     m['call'] = dmr_id
                 if contacts is not None and dmr_id != 0:
-                    c = contacts[float(dmr_id)]
-                    if c is None: c = contacts[float(dmr_id + 0.1)]
+                    c = contacts[float(dmr_id) + (0.1 if flags & 0x4 else 0.0)]
+                    if c is None: #Try the oposite record type in case of change
+                        c = contacts[float(dmr_id) + (0.0 if flags & 0x4 else 0.1)]
                     if c is not None:
                         m['callsign' ] = str(c)
                 self.messages.append(m) # += [ m ]
