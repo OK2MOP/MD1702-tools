@@ -154,7 +154,7 @@ class DM1702_contact(object):
     @staticmethod
     def from_MD_record(data):
         call, tcid = unpack('<2x16sxLx', data)
-        call = call.decode(errors="ignore").rstrip('\x00')
+        call = call.decode(errors="ignore").split('\x00')[0]
         cid = tcid & 0xffffff
         ctype = (tcid >> 24) & 0xf
         #print(call, cid, ctype)

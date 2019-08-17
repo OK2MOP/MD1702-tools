@@ -14,9 +14,13 @@ class DM1702_messages(object):
     idx_max  = 0x110
     data_start = 0x130
     data_skip = 0x110
-    message_flags = { 1 : 'OK', 3 : 'unread' }
+    message_flags = { 1 : 'OK', 3 : 'unread', 5: 'OK (group)', 7: 'unread (group)'}
 
-    def __init__(self, data, mtype, scan=False):
+    @staticmethod
+    def csv_hdr():
+        return "message_group,DMR_ID,callsign,status,message"
+
+    def __init__(self, data, mtype, scan=False, contacts=None):
         self.messages = []
         self.mtype = mtype
         if mtype == 'templates':
@@ -53,7 +57,15 @@ class DM1702_messages(object):
                 dmr_id = d2[13] | (d2[14] << 8) | (d2[15] << 16)
                 mlen -= 3 if mlen > 3 else 0 # 3 bytes for DMR ID
                 msg = DM1702_util.to_str(d2, 0x10, mlen)
-                self.messages += [ {'text' : msg, 'call' : dmr_id, 'status': DM1702_messages.message_flags[flags]} ]
+                m = {'text' : msg, 'status': DM1702_messages.message_flags[flags]}
+                if dmr_id != 0:
+                    m['call'] = dmr_id
+                if contacts is not None and dmr_id != 0:
+                    c = contacts[float(dmr_id)]
+                    if c is None: c = contacts[float(dmr_id + 0.1)]
+                    if c is not None:
+                        m['callsign' ] = str(c)
+                self.messages.append(m) # += [ m ]
 
     def __repr__(self):
         return str(self.messages)
@@ -70,8 +82,9 @@ class DM1702_messages(object):
     def __str__(self):
         str = ""
         for i in range(0,len(self.messages)):
-            str += 'MSG,%s,%i,%s,%s,%s\n' % (self.mtype, i, \
+            str += '%s,%s,%s,%s,%s\n' % (self.mtype, \
                         "%i" % self.messages[i]["call"] if "call" in self.messages[i] else "",\
+                        DM1702_util.csv_esc(self.messages[i]["callsign"]) if "callsign" in self.messages[i] else "",\
                         self.messages[i]["status"] if "status" in self.messages[i] else "",\
                         DM1702_util.csv_esc(self.messages[i]["text"]))
         return str
@@ -166,7 +179,7 @@ class DM1702_codeplug(object):
             if mt2 not in DATA_chains:
                 sys.stderr.write("Unknown message type %s, skipping.\n" % mtype)
             elif DATA_chains[mt2][0] in self.marks:
-                result[mtype] = DM1702_messages(self.get_data(mt2), mtype, deleted)
+                result[mtype] = DM1702_messages(self.get_data(mt2), mtype, deleted, self.contacts)
         return result
 
     def get_cbc_map(self, mapping, ch_mode=True):

@@ -142,7 +142,7 @@ def upload(dfu, filename, start=0, end=0xFFFFFF, crop=True):
     finally:
         f.close()
 
-def upload_codeplug(dfu, filename):
+def upload_codeplug(dfu, filename, extra=False):
     """Dumps the SPI CODEPLUG data from SPI flash, searches in given range."""
     f = open(filename, 'wb')
     if f is None:
@@ -166,6 +166,7 @@ def upload_codeplug(dfu, filename):
         sector_map = dfu.get_cp_map()
         sys.stdout.write('+')
         sys.stdout.flush()
+        done = []
         for idx in range(2,max(DATA_map)+1):
             if DATA_map[idx] is None:
                 f.write(array('B', [0] * dfu.sector_size))
@@ -185,6 +186,21 @@ def upload_codeplug(dfu, filename):
                 f.close()
                 os.remove(filename)
                 return
+            done.append(DATA_map[idx])
+        if extra:
+            #print(sector_map)
+            for idx in sector_map:
+                if idx not in done:
+                    #print("Extra sector 0x%02x" % idx)
+                    part = sector_map[idx] * dfu.sector_size
+                    data = dfu.upload_spi(part, dfu.sector_size, crop=False, silent=True)
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                    if data is not None and len(data) == dfu.sector_size:
+                        f.write(data)
+                    else:
+                        sys.stderr.write("Skipping incomplete/missing data block 0x%02x for ID 0x%02x\n" % (sector_map[idx], idx))
+            #    if DATA_map
         sys.stdout.write('\n')
         sys.stdout.flush()
     finally:
@@ -286,6 +302,9 @@ Read a RAW codeplug and write it to a file (RAW with readcp, DATA CPS file with 
     md1702-dfu readcp <codeplug.raw>
     md1702-dfu read <codeplug.data>
 
+Read a DATA CPS file extended with extra sectors not found in DATA file (SMS, calls)
+    md1702-dfu readall <codeplug_extra.raw>
+
 Display device version information
     md1702-dfu versions
 
@@ -327,10 +346,13 @@ def main():
                 print("Dumping RAW codeplug.")
                 upload(dfu, sys.argv[2], dfu.cps_start, dfu.cps_end)
 
-            elif sys.argv[1] == 'read' and sys.argv[2].split('.')[-1].lower() == "data":
-                dfu = init_dfu()
-                print("Dumping DATA CPS file.")
-                upload_codeplug(dfu, sys.argv[2])
+            elif sys.argv[1] in ['read', 'readall']:
+                if sys.argv[1] == 'read' and sys.argv[2].split('.')[-1].lower() != "data":
+                    usage()
+                else:
+                    dfu = init_dfu()
+                    print("Dumping DATA CPS file.")
+                    upload_codeplug(dfu, sys.argv[2], sys.argv[1] == 'readall')
 
             elif sys.argv[1] == 'readlogo':
                 dfu = init_dfu()
