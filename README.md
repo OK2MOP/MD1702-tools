@@ -20,6 +20,8 @@ must be removed for the device.
 Client Tools:
 * `md1702-dfu` reads and writes MD1702 codeplugs, firmware and time. Run it without
 an argument to show help.
+* `md1702-codeplug` allows you to import contacts to CPS and split CPS into several
+CSV files which can be merged together with the CPS later to allow easier batch editing
 * `md1702-gfx` allows you to convert the boot logo graphics into an image editable in
 external tool and back, and to show the boot logo image extracted from the radio.
 * `md1702-rec` allows you to extract RAW DMR audio files, which can be decoded using

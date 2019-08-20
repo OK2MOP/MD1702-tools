@@ -31,7 +31,7 @@ specialPrivate = {
 
 contactFormats = {
     'CPS' : {
-        # MD1702 internal XLS format for copy & paste
+        'info' : 'MD1702 internal XLS format for copy & paste',
         'fields': ['No.', 'Call Alias' , 'Call Type', 'Call ID'],
         'quotechar' : None,
         'delimiter': ',' ,
@@ -46,7 +46,7 @@ contactFormats = {
         'country' : None
     },
     'dmrid' : {
-        # https://ham-digital.org/user-by-call.php
+        'info' : 'https://ham-digital.org/user-by-call.php',
         'fields': ['num', 'dmrid', 'callsign', 'name', 'country', 'ctry', 'dev_id'],
         'quotechar' : None,
         'delimiter': ';' ,
@@ -61,7 +61,7 @@ contactFormats = {
         'country' : 'ctry'
     },
     'bmgroup' : {
-        # BrandMeister Talkgroups CSV export from https://brandmeister.network/?page=talkgroups
+        'info' : 'BrandMeister Talkgroups CSV export from https://brandmeister.network/?page=talkgroups',
         'fields': ['Country','Talkgroup','Name',''],
         'quotechar' : '"',
         'delimiter': ',' ,
@@ -75,8 +75,23 @@ contactFormats = {
         'name': None,
         'country' : None
     },
+    'bmuser' : {
+        'info' : 'BrandMeister User CSV export from https://brandmeister.network/?page=contactsexport',
+        'fields': ['ID','Call','Name','Last TX', 'TX Count'],
+        'quotechar' : '"',
+        'delimiter': ',' ,
+        'seek' : None,
+        'fixed' : {},
+        'number': None,
+        'callSign' : 'Call',
+        'callTypes': None,
+        'callType': 3,
+        'id' : 'ID',
+        'name': 'Name',
+        'country' : None
+    },
     'RT3S' : {
-        # Downloads at https://www.ailunce.com/ResourceCenter
+        'info' : 'Downloads at https://www.ailunce.com/ResourceCenter',
         'fields': ['Radio ID', 'CallSign', 'Name', 'NickName', 'City', 'State', 'Country'],
         'quotechar' : None,
         'delimiter': ',' ,
@@ -91,7 +106,7 @@ contactFormats = {
         'country' : 'Country'
     },
     'MD380CPS' : {
-        # MD380 CPS format
+        'info' : 'MD380 CPS format',
         'fields': ['Contact Name', 'Call Type', 'Call ID', 'Call Receive Tone'],
         'quotechar' : None,
         'delimiter': ',' ,
@@ -382,7 +397,13 @@ class DM1702_contacts(object):
 
     def save(self, outfile, ftype):
         import csv
-        if ftype not in contactFormats:
+        if ftype.lower() == 'list':
+            sys.stderr.write('Supported output formats (%i)' % len(contactFormats))
+            for cf in contactFormats:
+                sys.stderr.write('\n%10s: %s' % (cf, contactFormats[cf]['info']))
+            sys.stderr.write('\n')
+            return
+        elif ftype not in contactFormats:
             raise Exception('Output contact file format not recognized')
         cf = contactFormats[ftype]
         ct = None

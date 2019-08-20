@@ -30,6 +30,12 @@ Read a raw codeplug file and write SMS messages to output CSV file
 Read contacts and append them to the existing codeplug (major CSV contact formats are supported)
     md1702-codeplug add contacts <input.data> <added.csv> <output.data>
 
+Export CPS contacts to major CSV contact formats (use format list to display available formats)
+    md1702-codeplug export contacts <input.data> <format> <output.csv>
+
+Convert CPS contacts beteen major CSV contact formats (use format list to display output formats)
+    md1702-codeplug convert contacts <input.csv> <format> <output.csv>
+
 """)
 
 def load_cps(infile):
@@ -69,10 +75,21 @@ def main():
             else:
                 usage()
         elif len(sys.argv) == 6:
-            if sys.argv[1] == 'add':
-                infile=sys.argv[3]
+            infile=sys.argv[3]
+            outfile=sys.argv[5]
+            if sys.argv[1] == 'convert':
+                if sys.argv[2] == 'contacts':
+                    print('Export of contacts')
+                    contacts = DM1702_contacts()
+                    contacts.load(infile)
+                    contacts.save(outfile, sys.argv[4])
+            elif sys.argv[1] == 'export':
+                if sys.argv[2] == 'contacts':
+                    print('Export of contacts')
+                    cp = load_cps(infile)
+                    cp.contacts.save(outfile, sys.argv[4])
+            elif sys.argv[1] == 'add':
                 csvfile=sys.argv[4]
-                outfile=sys.argv[5]
                 if sys.argv[2] == 'contacts':
                     print('Adding additional contacts')
                     cp = load_cps(infile)

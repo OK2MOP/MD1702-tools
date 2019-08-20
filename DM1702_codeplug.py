@@ -248,7 +248,7 @@ class DM1702_codeplug(object):
     def save_contacts(self):
         cmap, cdata, skipped = self.contacts.export_CP()
         if skipped > 0:
-            sys.stderr.write("Warning: Contact data too large, %i contacts ignored" % (skipped))
+            sys.stderr.write("Warning: Contact data too large, %i contacts ignored\n" % (skipped))
         btn=self.set_cbc_map(self.btn_map, self.get_data_size('Buttons'), False)
         cc=self.set_cbc_map(self.c_c_map, self.get_data_size('Channel_contact'), True)
 
