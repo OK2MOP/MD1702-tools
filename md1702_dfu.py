@@ -283,7 +283,7 @@ def init_dfu(alt=0, dfu_mode=True):
             else:
                 raise e
     else:
-        dev.default_timeout = 15000
+        dev.default_timeout = 5000
     return dfu
 
 
@@ -445,6 +445,7 @@ def main():
                     data = f.read()
                     dfu = init_dfu(dfu_mode=False)
                     dfu.enter_bootloader_mode()
+                    dfu.set_timeout(60000)
                     dfu.download_fw(data, sys.argv[2])
             else:
                 usage()

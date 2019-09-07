@@ -251,6 +251,9 @@ class DM1702_DFU(object):
         self.reboot_fw()
         print('Upgrade finished, turn the device off and on normally')
 
+    def set_timeout(self, timeout):
+        self._device.default_timeout = timeout
+
     def reboot(self):
         self.send_text(Requests['NEXT'])
         return True
