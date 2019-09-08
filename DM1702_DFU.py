@@ -68,7 +68,8 @@ DFUComm = {
         'Reboot' : '\x04',
         'ModelReply' : 'M\x01\x09',
         'VersionPrefix': 'MD1702-V',
-        'Supported' : [ 1, 2 ], # supported versions of bootloader
+        'Supported' : [ 1 ], # supported versions of bootloader - disabled V2 as somebody has issues upgrading
+        #'Supported' : [ 1, 2 ], # supported versions of bootloader
     }
 
 
