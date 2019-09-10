@@ -68,8 +68,8 @@ DFUComm = {
         'Reboot' : '\x04',
         'ModelReply' : 'M\x01\x09',
         'VersionPrefix': 'MD1702-V',
-        'Supported' : [ 1 ], # supported versions of bootloader - disabled V2 as somebody has issues upgrading
-        #'Supported' : [ 1, 2 ], # supported versions of bootloader
+        #'Supported' : [ 1 ], # supported versions of bootloader - disabled V2 as somebody has issues upgrading
+        'Supported' : [ 1, 2 ], # supported versions of bootloader, re-enabled V1
     }
 
 
@@ -225,6 +225,17 @@ class DM1702_DFU(object):
         print('Sending file name succeeded, starting upgrade')
         block_id=1
         caddr=0x8000
+        #print("Length of data before padding %i" % len(in_data))
+        if len(in_data) % self.sector_size != 0:
+            pad_l = self.sector_size - (len(in_data) % self.sector_size)
+            if isinstance(in_data, str):
+                in_data += '\xff' * pad_l
+            else:
+                i2 = bytearray(in_data)
+                for i in range(0,pad_l):
+                    i2.append(0xff)
+                in_data = bytes(i2)
+        #print("Length of data after padding %i" % len(in_data))
         while len(in_data) > 0:
             if isinstance(in_data, str):
                 block=chr(block_id & 0xff) + chr((0xff-(block_id & 0xff))) + in_data[:1024]
