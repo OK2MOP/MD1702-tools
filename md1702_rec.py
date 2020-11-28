@@ -220,6 +220,9 @@ def upload_recs(dfu, prefix, start, end, newer_than=None, scan=False):
     fwversion = int(dfu.to_str(dfu.verify(Versions['FWVersion'])).split('.')[-1])
     sblock = start >> 12
     eblock = end >> 12
+    if start == end:
+        print("This firmware does not support storage of recordings, probably due to CSV contacts")
+        return
     if (sblock << 12) != start:
         raise Exception("Start position (0x%06x) not at sector boundary, something is wrong" % start)
     maxs=6
@@ -416,9 +419,11 @@ def main():
                 import usb.core
                 dfu = init_dfu()
                 start, end = dfu.verify_addrs(Versions['Recordings'])
+                if start == end:
+                    print("This firmware does not support storage of recordings, probably due to CSV contacts")
+                    return
                 dfu.enter_spi_usb_mode()
                 show_record_info(dfu, start)
-
             elif sys.argv[1] == 'reboot':
                 import usb.core
                 dfu = init_dfu()

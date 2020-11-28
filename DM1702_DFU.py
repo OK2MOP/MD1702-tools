@@ -23,8 +23,14 @@ Requests = {
         'SINFO' : 'SYSINFO',
         'TIMESET' : 'RTCITEM',
         'MSEL' : B'\xff\xff\xff\xff\x0c',
-        'MODEL' : 'DMR1702',
         'PCMODE' : '\x02',
+}
+
+Models = [ 'DMR1702', 'DM1702S' ]
+
+Deltas = {
+        'DMR1702' : 40,
+        'DM1702S' : 0x100
 }
 
 Statuses = {
@@ -34,6 +40,7 @@ Statuses = {
         'sPasswordSettingOK' : '\x50\x00\x00',
         'sWrongPassword' : '\x15',
         'sCorrectDevice' : 'DMR1702',
+        'sCorrectDevice2' : 'DM1702S',
         'sPCM8FF' : '\xff' * 8,
     }
 
@@ -53,6 +60,7 @@ Versions = {
         'CPSFormat' : 11,
         'Custom' : 13,
         'Logo' : 14,
+        'CSVContacts' : 15,
     }
 
 DFUComm = {
@@ -80,6 +88,7 @@ class DM1702_DFU(object):
     max_fw_size = 0xF7000
     min_known_fw_size = 0x9EF00
     delta = 0x40 # Maximum save block size is 64 bytes
+    model = Models[0]
 
     @staticmethod
     def crc16_xmodem(data, crc=0x0000):
@@ -391,7 +400,9 @@ class DM1702_DFU(object):
             command = ord(command)
         addr.insert(0,command)
         if length is not None:
-            addr.append(length)
+            addr.append(length % 0x100)
+            if self.model == 'DM1702S':
+                addr.append(length // 0x100)
         if not isinstance(addr, array):
             addr = array('B', addr)
         if data is not None:
@@ -410,7 +421,7 @@ class DM1702_DFU(object):
 
     def read(self, verify=False):
         data=self._device.read(self._ep2.bEndpointAddress,self._ep2.wMaxPacketSize)
-        if (verify and len(data) < 3) or (not verify and len(data) < 5):
+        if (verify and len(data) < 3) or (not verify and len(data) < 5) or (not verify and self.model == 'DM1702S' and len(data) < 6):
             data2 = self._device.read(self._ep2.bEndpointAddress,self._ep2.wMaxPacketSize)
             data = data + data2
         if verify:
@@ -419,10 +430,15 @@ class DM1702_DFU(object):
             adr=[0,0,0]
             data=data[3:]
         else:
-            dlen=data[4]
             cmd=data[0]
-            adr=data[1:4]
-            data=data[5:]
+            if self.model == 'DM1702S':
+                adr=data[1:4]
+                dlen=data[4] + (data[5] * 0x100)
+                data=data[6:]
+            else:
+                adr=data[1:4]
+                dlen=data[4]
+                data=data[5:]
         while len(data) < dlen:
             data=data + self._device.read(self._ep2.bEndpointAddress,self._ep2.wMaxPacketSize)
         #print("Reply: %s" % self.hd(data))
@@ -446,7 +462,7 @@ class DM1702_DFU(object):
             return data[3]
 
     def verify_addrs(self, command):
-        if command in  [ 6, 7, 8, 9, 0xa, 0xe ]:
+        if command in  [ 6, 7, 8, 9, 0xa, 0xe, 0xf ]:
             resp = self.verify(command)
             if len(resp) == 8 :
                 addresses=struct.unpack("<LL",resp)
@@ -462,8 +478,11 @@ class DM1702_DFU(object):
         self.send_text(Requests['SEARCH'])
         data = self.read_reply()
         RxData = data[1:]
-        if data[0] != Statuses['OK'] or RxData != Statuses['sCorrectDevice'] :
+        if data[0] != Statuses['OK'] or not (RxData in Models) :
             raise Exception('Device detection error (status %i, device string %s)' % (ord(data[0]), RxData))
+        else:
+            self.model = RxData
+            self.delta = Deltas [ self.model ]
         self.send_text(Requests['PCHECK'])
         data = self.read_reply()
         if data != Statuses['sPasswordSettingOK'] :
@@ -479,7 +498,7 @@ class DM1702_DFU(object):
 
     def enter_spi_usb_mode(self):
         self.send_text(Requests['MSEL'])
-        self.send_text(Requests['MODEL'])
+        self.send_text(self.model)
         data = self.read_reply()
         if data != Statuses['OK'] :
             raise Exception('DMR1702 device check failed')

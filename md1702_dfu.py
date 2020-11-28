@@ -84,11 +84,19 @@ def display_versions(dfu):
     for i in [ 'FWVersion', 'RefDate', 'DataFormat', 'GPSFormat', 'CPSFormat' ] :
         print("%s= %s"  % (i + (' ' * (12-len(i))), dfu.to_str(dfu.verify(Versions[i]))))
 
-    for i in [ 'Voices', 'HZKFont', 'Recordings', 'Settings', 'Logo', 'Unknown1' ]:
+    ranges = [ 'Voices', 'HZKFont', 'Recordings', 'Settings', 'Logo', 'Unknown1' ]
+    if dfu.model == 'DM1702S':
+        ranges += [ 'CSVContacts' ]
+    for i in ranges:
         start, end = dfu.verify_addrs(Versions[i])
         print("%s= 0x%06x - 0x%06x "  % (i+ (' ' * (12-len(i))), start, end ))
     dfu.enter_spi_usb_mode()
     print('DeviceID    = 0x%s' % dfu.hd(dfu.verify(Versions['DeviceID'])))
+    return
+    if dfu.model == 'DM1702S':
+        for i in [ 'CSVContacts' ]:
+            start, end = dfu.verify_addrs(Versions[i])
+            print("%s= 0x%06x - 0x%06x "  % (i+ (' ' * (12-len(i))), start, end ))
 
 def upload_firmware(dfu, filename):
     """Dumps the firmware at 0x8008000."""
