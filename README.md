@@ -6,8 +6,11 @@ by Pavel Moravec, OK2MOP
 
 This repository contains tools for working with the MD-1702 based radios
 over USB. It is based on the reverse-engineered communication protocol and
-can be used with Baofeng DM-1702 and DM-X radios (theoretically also with
-DM-1703 and other radios sharing this codebase).
+can be used with Baofeng DM-1702 (V02 and L02 firmware branch) and DM-X radios 
+(theoretically also with DM-1703 and other radios sharing this codebase). 
+
+**Please do NOT use it to write data to a device with L05 firmware, as it is not 
+tested and it was reported to brick the device in the issues.**
 
 I have tried to make the tool similar to popular `md380-dfu` tool by Travis
 Goodspeed, KK4VCZ. The `stm32-dfu` from his repository could be used if somebody
