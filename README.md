@@ -9,8 +9,13 @@ over USB. It is based on the reverse-engineered communication protocol and
 can be used with Baofeng DM-1702 (V02 and L02 firmware branch) and DM-X radios 
 (theoretically also with DM-1703 and other radios sharing this codebase). 
 
-**Please do NOT use it to write data to a device with L05 firmware, as it is not 
-tested and it was reported to brick the device in the issues.**
+**Please do NOT use it to write data to a device with L05 firmware and MD1706-V2 
+version of the bootloader, as it is not tested and it was reported to brick the 
+device in the issues.** (The tool is working with L05.000.05 firwmare itself on 
+older MD1702-V1/V2 devices).
+
+**Please do not remove safety checks in the code concerning the device/bootloader
+version, they are there as a protection against bricking the radio.**
 
 I have tried to make the tool similar to popular `md380-dfu` tool by Travis
 Goodspeed, KK4VCZ. The `stm32-dfu` from his repository could be used if somebody
