@@ -11,7 +11,7 @@ can be used with Baofeng DM-1702 (V02 and L02 firmware branch) and DM-X radios
 
 **Please do NOT use it to write data to a device with L05 firmware and MD1706-V2 
 version of the bootloader, as it is not tested and it was reported to brick the 
-device in the issues.** (The tool is working with L05.000.05 firwmare itself on 
+device in the issues.** (The tool is working with L05.000.05 firmware itself on 
 older MD1702-V1/V2 devices).
 
 **Please do not remove safety checks in the code concerning the device/bootloader
